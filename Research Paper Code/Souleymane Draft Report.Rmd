@@ -1,0 +1,1081 @@
+---
+title: 'Draft Report: Leveraging Artificial Intelligence to Mitigate Delays and Cost
+  Overruns in Public Infrastructure Construction Projects'
+author: "Souleymane Doumbia"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+
+\newpage
+
+# Introduction (Analysis and Modeling part of the report)
+Large-scale public infrastructure projects in New York City (NYC) are prone to delays and budget overruns, costing the city time, money, and public trust. This capstone project leverages publicly available capital project data to identify, quantify, and model risk factors that contribute to these inefficiencies. The project integrates data from several official sources, including citywide budget and schedule dashboards, milestone tracking datasets, and project-level capital spending records from NYC Open Data.
+
+Initial exploratory data analysis revealed significant variation in project performance. Categories such as **Parks & Recreation** and **Public Buildings** dominate the project portfolio, with a disproportionate share of both delays and cost overruns. Many projects are concentrated in phases like **construction** and **design**, where planning uncertainty and procurement bottlenecks often introduce risks.
+
+To quantify these risks, we performed classification of projects based on:
+
+- Cost performance (`cost_class`): Over, Under, or On Budget (±15% threshold)
+
+- Schedule performance (`delay_class`): Delayed, Early, or On Time (±30-day threshold)
+
+- Combined cost/schedule risk (`high_risk`): Projects that are both delayed and over budget
+
+These classifications form the basis for further **predictive modeling**, where we aim to identify which features — such as project phase, borough, agency, category group, or textual descriptions — are most associated with project failure modes.
+
+
+---
+
+\newpage
+
+# 1. Examining the datasets
+## 1.1 Loading the datasets
+```{r load-datasets, message=FALSE, warning=FALSE}
+# Load required libraries
+library(readr)
+library(dplyr)
+library(janitor)
+
+# Load CSV files
+budget_schedule <- read_csv("Capital_Projects_Dashboard_-_Citywide_Budget_and_Schedule_20250413.csv") %>%
+  clean_names()
+
+project_dollars <- read_csv("Capital_Project_Detail_Data_-_Dollars_20250413.csv") %>%
+  clean_names()
+
+project_milestones <- read_csv("Capital_Project_Detail_Data_-_Milestones_20250413.csv") %>%
+  clean_names()
+
+# Peek at structure
+#glimpse(budget_schedule)
+#glimpse(project_dollars)
+#glimpse(project_milestones)
+```
+
+
+## 1.2 Merging all datasets
+```{r merge-initial, warning=FALSE}
+#Basic Join on FMS ID + Project Name
+
+# Merge budget_schedule and project_dollars on fms_id (same as project_id) and project name
+merged_projects <- budget_schedule %>%
+  inner_join(project_dollars, by = c("fms_id" = "project_id", 
+                                     "fms_project_name" = "project_descr"))
+
+# View merged results
+#glimpse(merged_projects)
+```
+
+
+# 2. Delay and Cost Overrun Analysis
+## 2.1. Cost Overrun Threshold
+```{r summarize-cost-overrun-threshold, message=FALSE, warning=FALSE}
+library(dplyr)
+library(lubridate)
+
+# 1. Convert reporting_period to actual date
+merged_projects <- merged_projects %>%
+  mutate(reporting_date = ymd(paste0(reporting_period, "01")))
+
+# 2. Extract earliest report (initial budget)
+budget_earliest <- merged_projects %>%
+  group_by(fms_id) %>%
+  slice_min(reporting_date, with_ties = FALSE) %>%
+  select(fms_id, initial_budget = total_budget)
+
+# 3. Extract latest report (final budget/spend)
+budget_latest <- merged_projects %>%
+  group_by(fms_id) %>%
+  slice_max(reporting_date, with_ties = FALSE) %>%
+  select(fms_id, latest_budget = total_budget, latest_spend = spend_to_date)
+
+# 4. Merge and classify cost status with 15% threshold
+budget_change <- budget_earliest %>%
+  left_join(budget_latest, by = "fms_id") %>%
+  mutate(
+    cost_diff = latest_budget - initial_budget,
+    cost_diff_pct = cost_diff / initial_budget,
+    cost_class = case_when(
+      cost_diff_pct > 0.15 ~ "Over Budget",
+      cost_diff_pct < -0.15 ~ "Under Budget",
+      TRUE ~ "On Budget"
+    )
+  )
+
+# 5. View result
+#head(budget_change)
+```
+
+
+## 2.2  Classify Schedule Delay
+```{r classify-schedule-delay-fixed, message=FALSE, warning=FALSE}
+library(dplyr)
+library(lubridate)
+library(janitor)
+
+# 1. Clean and prepare milestone data
+milestone_clean <- project_milestones %>%
+  clean_names() %>%
+  mutate(
+    orig_start_date = mdy(orig_start_date),
+    orig_end_date = mdy(orig_end_date),
+    task_end_date = mdy(task_end_date)
+  ) %>%
+  filter(!is.na(orig_start_date), !is.na(orig_end_date), !is.na(task_end_date))  # Keep valid rows
+
+# 2. Extract final milestone per project
+# We'll assume the latest SEQ_NUMBER is the final project phase (according to the data sctructure)
+final_milestones <- milestone_clean %>%
+  group_by(project_id) %>%
+  slice_max(seq_number, with_ties = FALSE) %>%
+  mutate(
+    planned_duration = as.numeric(orig_end_date - orig_start_date),
+    actual_duration = as.numeric(task_end_date - orig_start_date),
+    delay_days = actual_duration - planned_duration,
+    delay_class = case_when(
+      delay_days > 30 ~ "Delayed",
+      delay_days < -30 ~ "Early",
+      TRUE ~ "On Time"
+    )
+  ) %>%
+  select(project_id, orig_start_date, orig_end_date, task_end_date, delay_days, delay_class)
+
+# 3. Preview delay classifications
+#head(final_milestones)
+```
+
+
+## 2.3 Merging Cost Overrun and Schedule Status
+```{r merge-cost-schedule-status, message=FALSE, warning=FALSE}
+# 1. Merge delay and cost classification into one dataset
+project_status <- budget_change %>%
+  inner_join(final_milestones, by = c("fms_id" = "project_id"))
+
+# 2. Create combined status label
+project_status <- project_status %>%
+  mutate(
+    status_combined = paste(delay_class, "&", cost_class)
+  )
+
+# 3. Preview result
+#head(project_status)
+```
+
+# 3. Exploratory Data Analysis
+## 3.1 Adding more features to Project Status Data
+```{r enrich-project-status, message=FALSE, warning=FALSE}
+library(dplyr)
+library(janitor)
+
+# 1. Clean column names if not already done
+merged_projects <- clean_names(merged_projects)
+project_dollars <- clean_names(project_dollars)
+
+# 2. Select and dduplicate relevant columns from merged_projects
+merged_info <- merged_projects %>%
+  select(
+    fms_id,
+    borough,
+    agency_project_description,
+    ten_year_plan_category,
+    current_phase,
+    spend_to_date_percent
+  ) %>%
+  distinct()
+
+# 3. Select and deduplicate relevant columns from project_dollars
+dollar_info <- project_dollars %>%
+  select(
+    project_id,
+    delay_desc,
+    scope_text,
+  ) %>%
+  distinct()
+
+# 4. Join into project_status
+project_status <- project_status %>%
+  left_join(merged_info, by = "fms_id") %>%
+  left_join(dollar_info, by = c("fms_id" = "project_id"))
+
+# 5. Check result
+#glimpse(project_status)
+#write_csv(project_status, "project_status_enriched.csv")
+```
+
+
+## 3.2 Cleaning the Enhance Project Data
+```{r clean-project-status, message=FALSE, warning=FALSE}
+# Remove empty, NA, or "#NA" descriptions
+project_status_clean <- project_status %>%
+  filter(
+    !is.na(agency_project_description),
+    !is.na(delay_desc),
+    agency_project_description != "",
+    delay_desc != "",
+    !agency_project_description %in% c("NA", "#NA"),
+    !delay_desc %in% c("NA", "#NA")
+  )
+
+project_status_clean <- project_status_clean %>%
+  filter(
+    !is.na(cost_diff_pct),
+    !is.na(ten_year_plan_category),
+    !is.na(scope_text)
+  )
+
+# View how many rows are left
+#nrow(project_status_clean)
+```
+
+
+## 3.3. Comprehensive Data Cleaning and Classification for Infrastructure Project Insights
+```{r visualize-status-flag-risk, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(forcats) # or fct_infreq
+library(dplyr)
+library(stringr)
+
+
+# Project profile
+project_status_clean <- project_status_clean %>%
+  mutate(project_profile = case_when(
+    delay_class == "Delayed" & cost_class == "Over Budget"    ~ "High Risk",
+    delay_class == "Delayed" & cost_class == "On Budget"      ~ "Schedule Risk",
+    delay_class == "Delayed" & cost_class == "Under Budget"   ~ "Time Risk, Cost-Saving",
+    delay_class == "On Time" & cost_class == "Over Budget"    ~ "Cost Risk",
+    delay_class == "On Time" & cost_class == "On Budget"      ~ "On Track",
+    delay_class == "On Time" & cost_class == "Under Budget"   ~ "Lean Delivery",
+    delay_class == "Early" & cost_class == "Over Budget"      ~ "Fast but Costly",
+    delay_class == "Early" & cost_class == "On Budget"        ~ "Strong Delivery",
+    delay_class == "Early" & cost_class == "Under Budget"     ~ "Exceptional Performance",
+    TRUE ~ "Unclassified"
+  ))
+
+
+
+# Cleaning current_phase
+project_status_clean <- project_status_clean %>%
+  mutate(
+    # Remove leading/trailing spaces and parentheses
+    current_phase = str_trim(current_phase),
+    current_phase = str_remove_all(current_phase, "[\\(\\)]"),
+    
+    # Standardize known variants
+    current_phase = case_when(
+      is.na(current_phase) | str_to_lower(current_phase) %in% c("n/a", "", "na") ~ "Stopped",
+      
+    current_phase %in% c("pre-design", "Pre-Design", "Property Acquisition") ~ "Pre-Design",
+    current_phase %in% c("Design", "Design Built", "Design-Build", "Design Build") ~ "Design",
+    current_phase %in% c("CONSTRUCTION", "Construction", "construction") ~ "Construction",
+    current_phase %in% c("Close-Out") ~ "Close-Out",
+    current_phase %in% c("Completed") ~ "Completed",
+    current_phase %in% c("Construction Procurement", "Partner-managed", "Consultant Services", "Equipment", "Procurement") ~ "Procurement",
+    current_phase %in% c("Pending","Cancelled", "CANCELLED", "Withdrawn", "Terminated", "Inactive", "On-hold", "On-Hold", "Defaulted") ~ "Stopped",
+      
+      TRUE ~ current_phase
+    )
+  )
+
+# Only unique row
+project_status_clean <- project_status_clean %>%
+  distinct()
+
+
+# Cleaning and categorizing agency_project_description
+project_status_clean <- project_status_clean %>%
+  mutate(
+    project_theme = case_when(
+      # === EXISTING CATEGORIES (KEEP UNCHANGED) ===
+      str_detect(agency_project_description, regex("ROOF|ROOFING|PARAPET|FACADE|BULKHEAD|ENVELOPE|CLADDING", ignore_case = TRUE)) ~ "Roof Work",
+      str_detect(agency_project_description, regex("ELEVATOR|LIFT|MODERNIZATION", ignore_case = TRUE)) ~ "Elevator Upgrade",
+      str_detect(agency_project_description, regex("ADA |ACCESSIBILITY|ADA COMPLIANCE|ADA REQUIREMENT|installing permanent steel piles| will reconstruct pavements citywide.", ignore_case = TRUE)) ~ "ADA Compliance",
+      str_detect(agency_project_description, regex("RENOVATION|REHABILITATION|BUILDOUT|RESTACKING|UPGRADE", ignore_case = TRUE)) ~ "Interior Renovation",
+      str_detect(agency_project_description, regex("BATHROOM", ignore_case = TRUE)) ~ "Bathroom Work",
+      str_detect(agency_project_description, regex("SAFETY|STREET|SIDEWALK|RAMP", ignore_case = TRUE)) ~ "Safety/Street Improvements",
+      str_detect(agency_project_description, regex("LIBRARY", ignore_case = TRUE)) ~ "Library Work",
+      str_detect(agency_project_description, regex("RELOCATION|RELOCATE|MOVE", ignore_case = TRUE)) ~ "Relocation/Move",
+      str_detect(agency_project_description, regex("EMERGENCY|REPAIR|REPLACEMENT|INSULATION", ignore_case = TRUE)) ~ "Emergency/Repair",
+      str_detect(agency_project_description, regex("PRECINCT|FLEET|LOCKER|POLICE|FIRE|VEHICLE| TOW POUND|- 9 NYPD SITES COMBINED|- HARBOR UNIT CHARLIE|NYPD - Brooklyn North Boro Command", ignore_case = TRUE)) ~ "Precinct/Fleet Facilities",
+      str_detect(agency_project_description, regex("BRIDGE|VIADUCT|OVERPASS| Over ", ignore_case = TRUE)) ~ "Bridge Work",
+      str_detect(agency_project_description, regex("DAM|RESERVOIR", ignore_case = TRUE)) ~ "Dam/Reservoir Work",
+      str_detect(agency_project_description, regex("SEWER|DRAIN|STORMWATER|SANITARY|WATER MAIN", ignore_case = TRUE)) ~ "Sewer/Water Infrastructure",
+      str_detect(agency_project_description, regex("PARK|PLAYGROUND|RECREATION|FIELD|GREENWAY", ignore_case = TRUE)) ~ "Parks & Recreation",
+      str_detect(agency_project_description, regex("FERRY|TERMINAL|MARINE|DOCK|BARGE|VESSEL", ignore_case = TRUE)) ~ "Marine Infrastructure",
+      str_detect(agency_project_description, regex("HVAC|MECHANICAL|VENTILATION|BMS|BOILER|CHILLER", ignore_case = TRUE)) ~ "Mechanical/Energy Systems",
+      str_detect(agency_project_description, regex("SOLAR|SUSTAINABLE|GREEN INFRASTRUCTURE|STORMWATER MANAGEMENT", ignore_case = TRUE)) ~ "Sustainability/Green Infrastructure",
+      str_detect(agency_project_description, regex("NEW CONSTRUCTION|NEW BUILDING|EXPANSION", ignore_case = TRUE)) ~ "New Construction",
+
+      # === NEW CATEGORIES (FOR UNMATCHED PROJECTS) ===
+      str_detect(agency_project_description, regex("MUSEUM|ZOO|AQUARIUM|BOTANICAL GARDEN|CULTURAL CENTER", ignore_case = TRUE)) ~ "Cultural Institutions",
+      str_detect(agency_project_description, regex("SHELTER|TRANSITIONAL HOUSING|FAMILY RESIDENCE|HOMELESS|BOWERY", ignore_case = TRUE)) ~ "Shelters/Human Services",
+      str_detect(agency_project_description, regex("FLOOD PROTECTION|MITIGATION|BULKHEAD|LEVEE|SHORELINE|REVETMENT|WETLAND", ignore_case = TRUE)) ~ "Flood Protection/Resilience",
+      str_detect(agency_project_description, regex("GENERATOR|ELECTRICAL|POWER DISTRIBUTION|TRANSFORMER|ODOR CONTROL", ignore_case = TRUE)) ~ "Power & Electrical Systems",
+      str_detect(agency_project_description, regex("TRIAL COURT|COURTHOUSE|COURTROOM|DA |LAW DEPT|OCA", ignore_case = TRUE)) ~ "Judicial/Court Facilities",
+      str_detect(agency_project_description, regex("LANDMARK|MEMORIAL|RESTORE|RESTORATION|HISTORIC|ARCH|FA[ÇC]ADE", ignore_case = TRUE)) ~ "Historic Restoration",
+      str_detect(agency_project_description, regex("PUBLIC ART|PERCENT FOR ART|ART INSTALLATION", ignore_case = TRUE)) ~ "Public Art",
+      str_detect(agency_project_description, regex("TUNNEL|SHAFT|CSO|STORAGE|UNDERGROUND|CONNECTION CHAMBER", ignore_case = TRUE)) ~ "Tunnels & Underground",
+      str_detect(agency_project_description, regex("TREE|REFORESTATION|PLANTING|HORTICULTURE|GARDEN", ignore_case = TRUE)) ~ "Tree Planting & Landscaping",
+      str_detect(agency_project_description, regex("SCHOOL|EDUCATION BUILDING|CLASSROOM|TEACHING|LAB|CUNY|UNIVERSITY|BMCC|CAMPUS", ignore_case = TRUE)) ~ "Education Facilities",
+str_detect(agency_project_description, regex("LOBBY|FLOOR|SPACE|INFRASTRUCTURE|BUILDING SYSTEMS", ignore_case = TRUE)) ~ "Interior Systems/Back-of-House",
+str_detect(agency_project_description, regex("PUMP|SLUDGE|SEWAGE|THICKENING", ignore_case = TRUE)) ~ "Wastewater Treatment",
+str_detect(agency_project_description, regex("FARM|GARDEN|WATER SERVICE|IRRIGATION", ignore_case = TRUE)) ~ "Urban Farming & Gardens",
+
+      # Default
+      TRUE ~ "Unknown"
+    )
+  )
+
+
+# Cleaning of delay_desc
+project_status_clean <- project_status_clean %>%
+  mutate(
+    delay_category = case_when(
+      str_detect(delay_desc, regex("BUDGETARY CONSTRAINTS|NON-CITY GRANT APPROVAL", ignore_case = TRUE)) ~ "Funding/Financial Issues",
+      str_detect(delay_desc, regex("CHANGES IN SCOPE/DESIGN", ignore_case = TRUE)) ~ "Scope or Design Changes",
+      str_detect(delay_desc, regex("SCHEDULING OF UTILITY WORK|UNAVAILABILITY OF PRODUCT|RELEASE OF NEW TECHNOLOGY", ignore_case = TRUE)) ~ "Resource or Technology Availability",
+      str_detect(delay_desc, regex("UNFORESEEN HAZARDOUS CONDITION|UNFORESEEN SITE/FIELD CONDITION", ignore_case = TRUE)) ~ "Unforeseen Site Conditions",
+      str_detect(delay_desc, regex("PENDING APPROVAL OF NECESSARY PERMITS|STATE REQ CONTRACT", ignore_case = TRUE)) ~ "Pending Governmental Approvals",
+      str_detect(delay_desc, regex("LEGAL ISSUES", ignore_case = TRUE)) ~ "Legal/Contractual Issues",
+      str_detect(delay_desc, regex("CONTRACTOR DEFAULT", ignore_case = TRUE)) ~ "Contractor Issues",
+      TRUE ~ "Other/Unknown"
+    )
+  )
+
+
+# Cleaning ten_year_plan_category
+project_status_clean <- project_status_clean %>%
+  mutate(
+    category_group = case_when(
+      str_detect(ten_year_plan_category, regex("PARK|RECREATION|PLAYGROUND|BOARDWALK|ZOOS|FAIR BRIDGES|TRAFFIC WORK", ignore_case = TRUE)) ~ "Parks & Recreation",
+      str_detect(ten_year_plan_category, regex("WATER|TUNNEL|MAIN REPLACEMENT|PLANT|FILTER|CITY TUNNEL|DISTRIBUTION", ignore_case = TRUE)) ~ "Infrastructure",
+      str_detect(ten_year_plan_category, regex("SHELTER|HOUSING|HOMELESS|LOW TO MODERATE INCOME|PUBLIC HOUSING", ignore_case = TRUE)) ~ "Housing",
+      str_detect(ten_year_plan_category, regex("SIDEWALK|RAMP|HIGHWAY|FERRY|STREET|BRIDGE", ignore_case = TRUE)) ~ "Transportation",
+      str_detect(ten_year_plan_category, regex("POLICE|COURT|FACILITIES|ADMIN|OFFICE|GARAGE", ignore_case = TRUE)) ~ "Public Buildings",
+      str_detect(ten_year_plan_category, regex("SUSTAINABILITY|GREEN INFRASTRUCTURE|ENVIRONMENT|WATER PRESERVATION|TREE PLANTING", ignore_case = TRUE)) ~ "Environmental",
+      TRUE ~ "Miscellaneous / Other"
+    )
+  )
+
+
+
+# Inspecting the clean data
+write_csv(project_status_clean, "project_status_clean.csv")
+```
+
+
+
+## 3.4 Summaise table of Project distibution
+```{r simple table, message=FALSE}
+
+table(project_status_clean$delay_class, project_status_clean$cost_class)
+```
+
+
+## 3.5 EDA by current_phase
+```{r}
+# Reorder factor levels by frequency
+project_status_clean <- project_status_clean %>%
+  mutate(status_combined = fct_infreq(status_combined))
+
+# Bar plot with ordered categories
+ggplot(project_status_clean, aes(x = status_combined)) +
+  geom_bar(fill = "#0073C2FF") +
+  labs(title = "Project Status Distribution",
+       x = "Combined Schedule & Cost Status",
+       y = "Number of Projects") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Project Profile Distribution
+ggplot(project_status_clean, aes(x = project_profile)) +
+  geom_bar(fill = "#0073C2FF") +
+  labs(title = "Project Profile Distribution",
+       x = "Project Profile",
+       y = "Number of Projects") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# 2. Add High Risk flag
+#project_status_clean <- project_status_clean %>%
+#  mutate(
+#    high_risk = ifelse(delay_class == "Delayed" & cost_class == "Over Budget", "Yes", "No")
+#  )
+
+# 3. Summary of high risk projects
+#table(project_status_clean$high_risk)
+
+
+## Goal: Understand how delays and cost overruns relate to project lifecycle stage.
+project_status_clean %>%
+  count(current_phase, delay_class) %>%
+  ggplot(aes(x = current_phase, y = n, fill = delay_class)) +
+  geom_col(position = "stack") +
+  labs(title = "Delays by Project Phase", x = "Project Phase", y = "# of Projects") +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  coord_flip() +
+  theme_minimal()
+
+project_status_clean %>%
+  count(current_phase, cost_class) %>%
+  ggplot(aes(x = current_phase, y = n, fill = cost_class)) +
+  geom_col(position = "stack") +
+  labs(title = "Cost Class by Project Category Group",
+       x = "Project Category Group",
+       y = "# of Projects") +
+  coord_flip() +
+  theme_minimal()
+```
+
+## 3.6 EDA by borough
+```{r}
+## Goal: See if spatial patterns exist in delays or costs.
+project_status_clean %>%
+  filter(borough != "Citywide") %>%
+  count(borough, project_profile) %>%
+  ggplot(aes(x = borough, y = n, fill = project_profile)) +
+  geom_col(position = "dodge") +
+  labs(title = "High Risk Projects by Borough", x = "Borough", y = "# of Projects")
+```
+
+## 3.7 EDA by "ten_year_plan_category", "Cost Class" and by "high_risk Flag"
+```{r eda-by-project-category-top18, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+
+# EDA: Delay class by category group
+project_status_clean %>%
+  count(category_group, delay_class) %>%
+  ggplot(aes(x = category_group, y = n, fill = delay_class)) +
+  geom_col(position = "stack") +
+  labs(title = "Delay Class by Project Category Group",
+       x = "Project Category Group",
+       y = "# of Projects") +
+  coord_flip() +
+  theme_minimal()
+
+
+# EDA: Cost Class
+project_status_clean %>%
+  count(category_group, cost_class) %>%
+  ggplot(aes(x = category_group, y = n, fill = cost_class)) +
+  geom_col(position = "stack") +
+  labs(title = "Cost Class by Project Category Group",
+       x = "Project Category Group",
+       y = "# of Projects") +
+  coord_flip() +
+  theme_minimal()
+
+# EDA: high_risk Flag
+project_status_clean %>%
+  count(category_group, project_profile) %>%
+  ggplot(aes(x = category_group, y = n, fill = project_profile)) +
+  geom_col(position = "stack") +
+  labs(title = "Project Profile by Category Group",
+       x = "Project Category Group",
+       y = "# of Projects") +
+  coord_flip() +
+  theme_minimal()
+
+# Using percentage delay class in category group
+project_status_clean %>%
+  group_by(category_group) %>%
+  count(delay_class) %>%
+  mutate(percentage = n / sum(n) * 100) %>%
+  ggplot(aes(x = category_group, y = percentage, fill = delay_class)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(y = "Percentage", title = "Project Timeliness by Category Group") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+## 3.8 Other EDA 1: Delay class percentage by project category group
+```{r}
+library(tidyverse)
+library(scales)
+project_status_clean %>%
+  group_by(category_group, delay_class) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(category_group) %>%
+  mutate(pct = count / sum(count)) %>%
+  ggplot(aes(x = category_group, y = pct, fill = delay_class)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  labs(
+    title = "Delay Status Distribution by Project Category Group",
+    x = "Project Category Group",
+    y = "Percentage of Projects",
+    fill = "Delay Status"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r delay-category-type, echo=FALSE, message=FALSE}
+# EDA 2: Frequency of delay categories (from delay_desc recoded into delay_category)
+project_status_clean %>%
+  count(delay_category) %>%
+  mutate(delay_category = fct_reorder(delay_category, n)) %>%
+  ggplot(aes(x = delay_category, y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Frequency of Delay Categories",
+    x = "Delay Category",
+    y = "Number of Projects"
+  ) +
+  theme_minimal()
+```
+
+```{r project-profile-distribution, echo=FALSE, message=FALSE}
+# EDA 3: Project profile summary by category group
+project_status_clean %>%
+  group_by(category_group, project_profile) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(category_group) %>%
+  mutate(share = count / sum(count)) %>%
+  ggplot(aes(x = category_group, y = share, fill = project_profile)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = percent_format()) +
+  labs(
+    title = "Project Profiles by Category Group",
+    x = "Category Group",
+    y = "Percent of Projects",
+    fill = "Profile"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+### 1. Time vs Budget Risk: Delay Class vs Cost Class
+library(ggplot2)
+
+ggplot(project_status_clean, aes(x = delay_class, fill = cost_class)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Time vs Budget Risk",
+       x = "Delay Classification",
+       y = "Percentage",
+       fill = "Cost Classification") +
+  theme_minimal()
+
+
+### 2. Delay by Current Phase
+project_status_clean %>%
+  filter(delay_class == "Delayed") %>%
+  count(current_phase) %>%
+  ggplot(aes(x = reorder(current_phase, -n), y = n)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(title = "Delays by Project Phase",
+       x = "Project Phase",
+       y = "Count of Delayed Projects") +
+  theme_minimal()
+
+
+### 3. Delay Category vs Project Profile
+library(dplyr)
+
+project_status_clean %>%
+  count(delay_category, project_profile) %>%
+  ggplot(aes(x = delay_category, y = n, fill = project_profile)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(title = "Delay Reason vs Project Profile",
+       x = "Delay Category",
+       y = "Project Count",
+       fill = "Project Profile") +
+  theme_minimal()
+
+```
+
+
+# 4. Modeling step
+
+## 4.1 Focus on specific columns for modeling
+```{r}
+# Exclude specific columns from the dataset "project_status_clean"
+# Updated columns to exclude: "agency_project_description", "ten_year_plan_category", "delay_desc", and "scope_text"
+
+project_model_data <- project_status_clean %>%
+  select(-c(agency_project_description, ten_year_plan_category, delay_desc, scope_text))
+
+# Inspecting the clean model data
+write_csv(project_model_data, "project_model_data.csv")
+```
+
+## 4.2 Adding Weather data
+```{r}
+# Load temperature anomaly dataset
+temp_data <- read.csv("temperature_data.csv")
+
+temp_data <- temp_data %>% 
+  rename(SEASON = Year) %>% 
+  mutate(SEASON = as.numeric(SEASON))
+#--------------------------------------------------------------------------------
+
+# Storm data
+storm_data <- read.csv("ibtracs.ALL.list.v04r01.csv")
+
+# Data Cleaning
+storm_data <- storm_data[-1, ]
+storm_data$SEASON <- as.numeric(storm_data$SEASON)
+storm_data <- storm_data %>% filter(SEASON >= 1850 & SEASON <= 2024)
+
+# Calculate yearly storm frequency
+storm_frequency <- storm_data %>%
+  group_by(SEASON) %>%
+  summarise(Number_of_Storms = n(), .groups = "drop")
+#--------------------------------------------------------------------------------
+  
+# Merge and calculate yearly metrics
+storm_correlation <- storm_data %>%
+  group_by(SEASON) %>%
+  summarise(Cyclone_Frequency = n(), .groups = "drop") %>%
+  left_join(temp_data, by = "SEASON")
+#-------------------------------------------------------------------------------
+
+# First, rename 'Anomaly' in both datasets before merging
+storm_correlation <- storm_correlation %>%
+  rename(Temp_Anomaly = Anomaly)
+
+# Merge storm and temperature data
+storm_intensity <- storm_data %>%
+  filter(SEASON != 'Year') %>%
+  group_by(SEASON) %>%
+  summarise(Max_Wind_Speed = max(as.numeric(USA_WIND), na.rm = TRUE), .groups = "drop") %>%
+  left_join(temp_data, by = "SEASON")
+
+
+storm_intensity <- storm_intensity %>%
+  select(-Anomaly)  # Remove to avoid duplication after join
+
+# Merge using SEASON as the key
+weather_data <- left_join(storm_correlation, storm_intensity, by = "SEASON") %>%
+  rename(year = SEASON)
+
+write_csv(weather_data, "weather_data.csv")
+```
+
+## 4.3 Addign Labor Data
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(readr)
+
+# Load the datasets
+construction_jobs <- read_csv("labor_data_construction_job.csv") %>%
+  mutate(construction_job = as.numeric(gsub(",", "", construction_job)))
+
+unemployment_rate <- read_csv("labor_data_unemployement_rate.csv")
+
+population <- read_csv("nyc_borough_population.csv")
+
+#-------------------------------------------------------------------------------
+
+# Calculate total NYC population per year
+population_totals <- population %>%
+  group_by(year) %>%
+  summarise(total_population = sum(borough_population, na.rm = TRUE))
+#-------------------------------------------------------------------------------
+
+# Merge population and totals to get population share
+population_with_share <- population %>%
+  left_join(population_totals, by = "year") %>%
+  mutate(population_share = borough_population / total_population)
+#-------------------------------------------------------------------------------
+
+
+# Merge with citywide construction job data
+labor_data <- population_with_share %>%
+  left_join(construction_jobs, by = "year") %>%
+  mutate(construction_jobs = round(population_share * construction_job))
+#-------------------------------------------------------------------------------
+
+# Merge with unemployment data
+labor_data_final <- labor_data %>%
+  select(year, borough, construction_jobs) %>%
+  left_join(unemployment_rate, by = c("year", "borough")) %>%
+  rename(labor_unemp_rate = unemployment_rate)
+
+# View or export the final dataset
+#print(labor_data_final)
+write_csv(labor_data_final, "final_labor_data.csv")
+```
+## 4.4 Combining weather and labor data
+```{r}
+weather_and_labor_data <- left_join(labor_data_final, weather_data, by = "year")
+
+# Compute Citywide averages for each year
+citywide_averages <- weather_and_labor_data %>%
+  group_by(year) %>%
+  summarise(
+    construction_jobs = mean(construction_jobs, na.rm = TRUE),
+    labor_unemp_rate = mean(labor_unemp_rate, na.rm = TRUE),
+    Cyclone_Frequency = mean(Cyclone_Frequency, na.rm = TRUE),
+    Temp_Anomaly = mean(Temp_Anomaly, na.rm = TRUE),
+    Max_Wind_Speed = mean(Max_Wind_Speed, na.rm = TRUE)
+  ) %>%
+  mutate(borough = "Citywide") %>%
+  select(year, borough, everything())  # reorder columns to match original
+
+# Bind Citywide rows to original dataset
+weather_and_labor_data <- bind_rows(weather_and_labor_data, citywide_averages)
+
+# Checking the weather and labor merged data
+write_csv(weather_and_labor_data, "weather_and_labor_data.csv")
+```
+
+## 4.5 Combining project model data with weather+labor data
+```{r}
+# Load required libraries
+library(dplyr)
+library(readr)
+library(lubridate)
+library(purrr)
+
+## Taking average weather_and_labor_data values per period of the project phase (e.g. 2001-2005)
+# Load datasets
+project_data <- read_csv("project_model_data.csv")
+weather_labor_data <- read_csv("weather_and_labor_data.csv")
+
+# Extract start and end years
+project_data <- project_data %>%
+  mutate(
+    orig_start_date = ymd(orig_start_date),
+    task_end_date = ymd(task_end_date),
+    start_year = year(orig_start_date),
+    end_year = year(task_end_date)
+  )
+
+# Define a function to calculate averages by year range and borough
+get_avg_weather_labor <- function(start_year, end_year, borough) {
+  subset <- weather_labor_data %>%
+    filter(
+      tolower(borough) == tolower(!!borough),
+      year >= start_year,
+      year <= end_year
+    )
+  
+  if (nrow(subset) == 0) {
+    return(tibble(
+      avg_construction_jobs = NA_real_,
+      avg_labor_unemp_rate = NA_real_,
+      avg_cyclone_freq = NA_real_,
+      avg_temp_anomaly = NA_real_,
+      avg_max_wind_speed = NA_real_
+    ))
+  }
+  
+  return(subset %>%
+           summarise(
+             avg_construction_jobs = mean(construction_jobs, na.rm = TRUE),
+             avg_labor_unemp_rate = mean(labor_unemp_rate, na.rm = TRUE),
+             avg_cyclone_freq = mean(Cyclone_Frequency, na.rm = TRUE),
+             avg_temp_anomaly = mean(Temp_Anomaly, na.rm = TRUE),
+             avg_max_wind_speed = mean(Max_Wind_Speed, na.rm = TRUE)
+           ))
+}
+
+# Apply the function rowwise to the project data
+averaged_weather_labor <- project_data %>%
+  mutate(row_id = row_number()) %>%
+  group_split(row_id) %>%
+  map_dfr(~ bind_cols(.x, get_avg_weather_labor(.x$start_year, .x$end_year, .x$borough)))
+
+# Final enriched dataset
+project_model_data_final <- averaged_weather_labor %>%
+  select(-row_id)
+##-------------------------------------------------------------------------------------------------
+
+## Mean Imputation for missing averaged_weather_labor values in project_model_data_final
+project_model_data_final <- project_model_data_final %>%
+  mutate(
+    avg_construction_jobs = ifelse(is.na(avg_construction_jobs), mean(avg_construction_jobs, na.rm = TRUE), avg_construction_jobs),
+    avg_labor_unemp_rate = ifelse(is.na(avg_labor_unemp_rate), mean(avg_labor_unemp_rate, na.rm = TRUE), avg_labor_unemp_rate),
+    avg_cyclone_freq = ifelse(is.na(avg_cyclone_freq), mean(avg_cyclone_freq, na.rm = TRUE), avg_cyclone_freq),
+    avg_temp_anomaly = ifelse(is.na(avg_temp_anomaly), mean(avg_temp_anomaly, na.rm = TRUE), avg_temp_anomaly),
+    avg_max_wind_speed = ifelse(is.na(avg_max_wind_speed), mean(avg_max_wind_speed, na.rm = TRUE), avg_max_wind_speed)
+  )
+##--------------------------------------------------------------------------------------------------
+
+# Replacing ~6% or data being project_theme = Unknown to the most frequent in the borough
+# Impute "Unknown" values in project_theme using the most frequent theme in each borough
+library(dplyr)
+
+project_model_data_final <- project_model_data_final %>%
+  group_by(borough) %>%
+  mutate(project_theme = if_else(
+    project_theme == "Unknown",
+    names(which.max(table(project_theme))),
+    project_theme
+  )) %>%
+  ungroup()
+
+
+# View(project_model_data_final)
+write_csv(project_model_data_final, "project_model_data_final.csv")
+```
+
+
+## 4.6 Predicting cost_class and delay_class separately
+```{r Predicting cost_class and delay_class separately}
+# ---- Setup for Predicting cost_class and delay_class separately ----
+library(caret)
+library(randomForest)
+library(rpart.plot)
+library(xgboost)
+library(Matrix)
+
+# --- Dataset for cost_class prediction (exclude cost_diff_pct and cost_class) ---
+cost_model_data <- project_model_data_final %>%
+  select(-c(cost_diff_pct, cost_class, fms_id, latest_budget, latest_spend, cost_diff, orig_start_date, orig_end_date, task_end_date, delay_class, status_combined, end_year, start_year, project_profile))
+
+# Add cost_class back as target
+cost_model_data$cost_class <- as.factor(project_model_data_final$cost_class)
+
+# --- Dataset for delay_class prediction (exclude delay_days and delay_class) ---#######
+delay_model_data <- project_model_data_final %>%
+  select(-c(delay_days, delay_class, fms_id, latest_budget, latest_spend, orig_start_date, orig_end_date, task_end_date, status_combined, cost_diff_pct, end_year, start_year, cost_class, project_profile))
+
+# Add delay_class back as target
+delay_model_data$delay_class <- as.factor(project_model_data_final$delay_class)
+
+# --- Reusable modeling pipeline function ---
+run_models <- function(data, target_col) {
+  # Set target variable
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  # Convert character to factor
+  categorical_vars <- sapply(data, is.character)
+  categorical_vars <- names(categorical_vars[categorical_vars])
+  categorical_vars <- setdiff(categorical_vars, target_col)
+  data[categorical_vars] <- lapply(data[categorical_vars], as.factor)
+
+  # Train-test split
+  set.seed(123)
+  train_index <- createDataPartition(data[[target_col]], p = 0.8, list = FALSE)
+  train_data <- data[train_index, ]
+  test_data <- data[-train_index, ]
+
+  # --Random Forest:Cross-validated and tuned Random Forest using caret---
+  control <- trainControl(method = "cv", number = 5)
+  tunegrid <- expand.grid(.mtry = c(2, 4, 6, 8))
+
+  rf_model <- train(
+    as.formula(paste(target_col, "~ .")),
+    data = train_data,
+    method = "rf",
+    metric = "Accuracy",
+    trControl = control,
+    tuneGrid = tunegrid
+  )
+  print(rf_model)
+
+  rf_preds <- predict(rf_model, newdata = test_data)
+  print(confusionMatrix(rf_preds, test_data[[target_col]]))
+  print(varImp(rf_model))
+
+  # --- Decision Tree with caret cross-validation---
+  dt_control <- trainControl(method = "cv", number = 5)
+  dt_model <- train(
+    as.formula(paste(target_col, "~ .")),
+    data = train_data,
+    method = "rpart",
+    trControl = dt_control,
+    tuneLength = 10
+  )
+  print(dt_model)
+  dt_preds <- predict(dt_model, test_data)
+  print(confusionMatrix(dt_preds, test_data[[target_col]]))
+  png(filename = paste0("decision_tree_", target_col, ".png"), width = 2400, height = 1600, res = 300)
+rpart.plot(dt_model$finalModel)
+dev.off()
+
+# Also show the trees in the console
+rpart.plot(dt_model$finalModel)
+
+  # --- XGBoost with cross-validation and early stopping---
+  train_matrix <- model.matrix(as.formula(paste(target_col, "~ .")), data = train_data)
+  test_matrix <- model.matrix(as.formula(paste(target_col, "~ .")), data = test_data)
+
+  xgb_train <- xgb.DMatrix(data = train_matrix, label = as.numeric(train_data[[target_col]]) - 1)
+  xgb_test <- xgb.DMatrix(data = test_matrix, label = as.numeric(test_data[[target_col]]) - 1)
+
+  xgb_cv <- xgb.cv(
+    data = xgb_train,
+    nrounds = 100,
+    nfold = 5,
+    early_stopping_rounds = 10,
+    objective = "multi:softmax",
+    num_class = length(unique(train_data[[target_col]])),
+    verbose = 1
+  )
+  best_nrounds <- xgb_cv$best_iteration
+
+  xgb_model <- xgboost(
+    data = xgb_train,
+    nrounds = best_nrounds,
+    objective = "multi:softmax",
+    num_class = length(unique(train_data[[target_col]])),
+    verbose = 0
+  )
+  xgb_preds <- predict(xgb_model, xgb_test)
+  xgb_preds_factor <- factor(xgb_preds + 1, levels = 1:length(levels(train_data[[target_col]])),
+                             labels = levels(train_data[[target_col]]))
+  print(confusionMatrix(xgb_preds_factor, test_data[[target_col]]))
+}
+
+# ---- Run for cost_class and delay_class ----
+suppressWarnings({
+  run_models(cost_model_data, "cost_class")
+  run_models(delay_model_data, "delay_class")
+})
+```
+
+## 4.7 Implementing modeling to predict project_profile
+```{r Implementing modeling on the final data}
+# ---Columns to Drop and move forward for modeling---------------------
+project_model_data_final_all <- project_model_data_final %>%
+  select(-c(
+    fms_id,
+    latest_budget, latest_spend, cost_diff,
+    orig_start_date, orig_end_date, task_end_date,
+    cost_class, delay_class, status_combined, delay_days, cost_diff_pct, end_year, start_year
+  ))
+
+
+# ---- Begin Classification Modeling for project_profile ----
+library(caret)
+library(randomForest)
+library(dummy)
+
+# Convert target and categorical predictors to factors
+project_model_data_final_all$project_profile <- as.factor(project_model_data_final_all$project_profile)
+
+# Identify categorical variables (excluding the target)
+categorical_vars <- sapply(project_model_data_final_all, is.character)
+categorical_vars <- names(categorical_vars[categorical_vars])
+categorical_vars <- setdiff(categorical_vars, "project_profile")
+
+# Convert character columns to factors
+project_model_data_final_all[categorical_vars] <- lapply(project_model_data_final_all[categorical_vars], as.factor)
+
+# Partition data into training and testing sets
+set.seed(123)
+train_index <- createDataPartition(project_model_data_final_all$project_profile, p = 0.8, list = FALSE)
+train_data <- project_model_data_final_all[train_index, ]
+test_data <- project_model_data_final_all[-train_index, ]
+
+# Cross-validated and tuned Random Forest using caret
+control <- trainControl(method = "cv", number = 5, search = "grid")
+tunegrid <- expand.grid(.mtry = c(2, 4, 6, 8))
+
+set.seed(123)
+rf_model <- train(
+  project_profile ~ .,
+  data = train_data,
+  method = "rf",
+  metric = "Accuracy",
+  trControl = control,
+  tuneGrid = tunegrid,
+  importance = TRUE
+)
+
+print(rf_model)
+
+# Predict on test data
+rf_preds <- predict(rf_model, newdata = test_data)
+
+# Evaluate performance
+conf_mat <- confusionMatrix(rf_preds, test_data$project_profile)
+print(conf_mat)
+
+# View feature importance
+#importance(rf_model)
+varImp(rf_model)
+
+# ---- Train Decision Tree and XGBoost Models for Comparison ----
+
+# Decision Tree with caret cross-validation
+dt_control <- trainControl(method = "cv", number = 5)
+dt_model <- train(
+  project_profile ~ .,
+  data = train_data,
+  method = "rpart",
+  trControl = dt_control,
+  tuneLength = 10
+)
+print(dt_model)
+predict_dt <- predict(dt_model, test_data)
+conf_mat_dt <- confusionMatrix(predict_dt, test_data$project_profile)
+print(conf_mat_dt)
+
+png(filename = "decision_tree_project_profile.png", width = 2400, height = 1600, res = 300)
+rpart.plot(dt_model$finalModel)
+dev.off()
+
+# Plot the decision tree
+library(rpart.plot)
+rpart.plot(dt_model$finalModel)
+
+# XGBoost with cross-validation and early stopping
+library(xgboost)
+library(Matrix)
+
+# Convert data to numeric matrix format
+train_matrix <- model.matrix(project_profile ~ . -1, data = train_data)
+test_matrix <- model.matrix(project_profile ~ . -1, data = test_data)
+
+xgb_train <- xgb.DMatrix(data = train_matrix, label = as.numeric(train_data$project_profile) - 1)
+xgb_test <- xgb.DMatrix(data = test_matrix, label = as.numeric(test_data$project_profile) - 1)
+
+xgb_cv <- xgb.cv(
+  data = xgb_train,
+  nrounds = 100,
+  nfold = 5,
+  early_stopping_rounds = 10,
+  objective = "multi:softmax",
+  num_class = length(unique(train_data$project_profile)),
+  verbose = 1
+)
+
+best_nrounds <- xgb_cv$best_iteration
+
+xgb_model <- xgboost(
+  data = xgb_train,
+  nrounds = best_nrounds,
+  objective = "multi:softmax",
+  num_class = length(unique(train_data$project_profile)),
+  verbose = 0
+)
+
+xgb_preds <- predict(xgb_model, xgb_test)
+xgb_preds_factor <- factor(xgb_preds + 1, levels = 1:length(levels(train_data$project_profile)),
+                           labels = levels(train_data$project_profile))
+
+conf_mat_xgb <- confusionMatrix(xgb_preds_factor, test_data$project_profile)
+print(conf_mat_xgb)
+```
+
+
+
