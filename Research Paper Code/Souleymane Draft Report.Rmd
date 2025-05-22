@@ -15,6 +15,8 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# Set working directory to the location of the open .Rmd file
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 ```
 
 ---
@@ -393,8 +395,8 @@ project_status_clean <- project_status_clean %>%
 # Bar plot with ordered categories
 ggplot(project_status_clean, aes(x = status_combined)) +
   geom_bar(fill = "#0073C2FF") +
-  labs(title = "Project Status Distribution",
-       x = "Combined Schedule & Cost Status",
+  labs(title = "Project Profile Distribution",
+       x = "Project Profile (Combined Schedule & Cost Status)",
        y = "Number of Projects") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -431,7 +433,7 @@ project_status_clean %>%
 
 project_status_clean %>%
   count(current_phase, cost_class) %>%
-  ggplot(aes(x = current_phase, y = n, fill = cost_class)) +
+  ggplot(aes(x = current_phase, y = n, fill = NULL)) +
   geom_col(position = "stack") +
   labs(title = "Cost Class by Project Category Group",
        x = "Project Category Group",
@@ -584,8 +586,8 @@ project_status_clean %>%
   filter(delay_class == "Delayed") %>%
   count(current_phase) %>%
   ggplot(aes(x = reorder(current_phase, -n), y = n)) +
-  geom_col(fill = "tomato") +
-  coord_flip() +
+  geom_col(fill = "#0073C2FF") +
+  #coord_flip() +
   labs(title = "Delays by Project Phase",
        x = "Project Phase",
        y = "Count of Delayed Projects") +
@@ -837,7 +839,122 @@ write_csv(project_model_data_final, "project_model_data_final.csv")
 ```
 
 
-## 4.6 Predicting cost_class and delay_class separately
+
+
+## 4.6 Updated Exploratory Data Summary and Visualization
+
+### 4.6.1 Descriptive Statistics
+```{r summary-table}
+# LIbraries
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(corrplot)
+library(knitr)
+library(kableExtra)
+
+
+project_model_data_final_2 <- project_model_data_final %>%
+  select(-c(fms_id, orig_start_date, orig_end_date, task_end_date, end_year, start_year))
+
+summary_table <- project_model_data_final_2 %>%
+  select_if(is.numeric) %>%
+  summary() %>%
+  as.data.frame()
+kable(summary_table, caption = "Descriptive Statistics of Numeric Variables") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+```
+
+
+### 4.6.2 Correlation Matrix (Numerical Variables)
+```{r correlation-matrix}
+numeric_data <- project_model_data_final_2 %>% select_if(is.numeric) %>% select(-c(avg_cyclone_freq, avg_temp_anomaly, avg_max_wind_speed))
+corr_matrix <- cor(numeric_data, use = "complete.obs")
+corrplot(corr_matrix, method = "color", type = "upper", tl.cex = 0.7, number.digits = 1, number.cex = 0.6)
+```
+
+
+### 4.6.3 Pairwise Scatter Plots: Cost/Delay vs Key Features
+```{r scatter-cost-delay}
+plot1 <- ggplot(project_model_data_final_2, aes(x = spend_to_date_percent, y = cost_diff_pct)) +
+  geom_point(alpha = 0.4) +
+  labs(title = "Spend To Date % vs. Cost Overrun", x = "Initial Budget ($)", y = "Cost Overrun (%)")
+
+plot2 <- ggplot(project_model_data_final_2, aes(x = avg_temp_anomaly, y = delay_days)) +
+  geom_point(alpha = 0.4, color = "tomato") +
+  labs(title = "Temperature Anomaly vs. Delay Days", x = "Avg Temp Anomaly", y = "Delay (Days)")
+
+
+# Add scaled variables to your dataset
+project_model_data_final_2 <- project_model_data_final_2 %>%
+  mutate(
+    spend_scaled = scale(spend_to_date_percent),
+    cost_diff_scaled = scale(cost_diff_pct)
+  )
+
+# Plot with scaled values
+plot3 <- ggplot(project_model_data_final_2, aes(x = spend_scaled, y = cost_diff_scaled)) +
+  geom_point(alpha = 0.4) +
+  labs(
+    title = "Scaled Spend To Date % vs. Cost Overrun",
+    x = "Scaled Spend to Date (%)",
+    y = "Scaled Cost Overrun (%)"
+  ) +
+  theme_minimal()
+
+grid.arrange(plot3, ncol = 1)
+
+```
+
+
+### 4.6.4 Distribution of Outcome Classes
+```{r outcome-distributions}
+plot_cost <- ggplot(project_model_data_final_2, aes(x = cost_class)) +
+  geom_bar(fill = "#0073C2FF") +
+  labs(title = "Distribution of Cost Class")
+
+plot_delay <- ggplot(project_model_data_final_2, aes(x = delay_class)) +
+  geom_bar(fill = "#EFC000FF") +
+  labs(title = "Distribution of Delay Class")
+
+plot_profile <- ggplot(project_model_data_final_2, aes(x = project_profile)) +
+  geom_bar(fill = "#0073C2FF") +
+  labs(title = "Distribution of project_profile") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+grid.arrange(plot_profile, ncol = 1)
+```
+
+### 4.6.5 Relationship between project_profile and categorical variables
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Create a list of categorical variables to compare with project_profile
+categorical_vars <- c("category_group", "borough", "current_phase", "project_theme", "delay_category")
+
+# Loop through each variable and generate a grouped bar chart
+for (var in categorical_vars) {
+  p <- ggplot(project_model_data_final_2, aes_string(x = var, fill = "project_profile")) +
+    geom_bar(position = "dodge") +
+    labs(title = paste("Project Profile by", var), x = var, y = "Count") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  print(p)
+}
+
+# Run Chi-Square Test for Independence
+for (var in categorical_vars) {
+  cat("\n\nChi-Square Test: project_profile vs", var, "\n")
+  print(chisq.test(table(project_model_data_final_2[["project_profile"]], project_data[[var]])))
+}
+```
+
+
+
+## 4.7 Predicting cost_class and delay_class separately
 ```{r Predicting cost_class and delay_class separately}
 # ---- Setup for Predicting cost_class and delay_class separately ----
 library(caret)
@@ -912,7 +1029,7 @@ rpart.plot(dt_model$finalModel)
 dev.off()
 
 # Also show the trees in the console
-rpart.plot(dt_model$finalModel)
+rpart.plot(dt_model$finalModel, box.palette = "Greens")
 
   # --- XGBoost with cross-validation and early stopping---
   train_matrix <- model.matrix(as.formula(paste(target_col, "~ .")), data = train_data)
@@ -952,7 +1069,8 @@ suppressWarnings({
 })
 ```
 
-## 4.7 Implementing modeling to predict project_profile
+
+## 4.8 Implementing modeling to predict project_profile
 ```{r Implementing modeling on the final data}
 # ---Columns to Drop and move forward for modeling---------------------
 project_model_data_final_all <- project_model_data_final %>%
@@ -1076,6 +1194,435 @@ xgb_preds_factor <- factor(xgb_preds + 1, levels = 1:length(levels(train_data$pr
 conf_mat_xgb <- confusionMatrix(xgb_preds_factor, test_data$project_profile)
 print(conf_mat_xgb)
 ```
+
+
+
+- - - - - - - - - - 
+
+
+
+# 5. Updated Modeling with restructured data (same data as above being WIDER now)
+
+## 5.1 Little cleaning
+```{r Little cleaning}
+# Load libraries
+library(dplyr)
+library(readr)
+
+# Load udpdated project_model_data_final with each line representing unique record of unique project
+project_model_data_final_updated <- read_csv("project_model_data_final_updated.csv")
+
+# Standardize all numeric variables
+#numeric_cols <- sapply(project_model_data_final_updated, is.numeric)
+#project_model_data_final_updated[, numeric_cols] <- scale(project_model_data_final_updated[, numeric_cols])
+
+# Scale weather variables
+weather_scaled <- scale(project_model_data_final_updated %>% 
+  select(avg_cyclone_freq, avg_temp_anomaly, avg_max_wind_speed))
+
+# Run k-means clustering
+set.seed(123)
+weather_clusters <- kmeans(weather_scaled, centers = 3)
+
+# Assign cluster labels as a categorical feature
+project_model_data_final_updated$weather_risk_category <- as.factor(weather_clusters$cluster)
+
+# Optional: Rename levels by risk (based on cluster centroids)
+centroids <- weather_clusters$centers
+cluster_order <- order(rowMeans(centroids))  # Order clusters by average risk
+levels(project_model_data_final_updated$weather_risk_category) <- c("Low", "Moderate", "High")[cluster_order]
+
+# Check the distribution
+#table(project_model_data_final_updated$weather_risk_category)
+write_csv(project_model_data_final_updated, "project_model_data_final_updated.csv")
+```
+
+
+## 5.2 [Same as 4.7] Predicting cost_class and delay_class separately
+```{r Predicting cost_class and delay_class separately 2}
+# ---- Setup for Predicting cost_class and delay_class separately ----
+library(caret)
+library(randomForest)
+library(rpart.plot)
+library(xgboost)
+library(Matrix)
+set.seed(123)
+
+# --- Dataset for cost_class prediction (exclude cost_diff_pct and cost_class) ---
+cost_model_data_updated <- project_model_data_final_updated %>%
+  select(-c(avg_cyclone_freq, avg_temp_anomaly, avg_max_wind_speed, status_combined, cost_class, fms_id, project_profile, cost_cat_environmental, cost_cat_housing, cost_cat_infrastructure, cost_cat_miscellaneous_other,  cost_cat_parks_recreation, cost_cat_public_buildings, cost_cat_transportation))
+
+# Add cost_class back as target
+cost_model_data_updated$cost_class <- as.factor(project_model_data_final_updated$cost_class)
+
+# --- Dataset for delay_class prediction (exclude delay_days and delay_class) ---#######
+delay_model_data_updated <- project_model_data_final_updated %>%
+  select(-c(avg_cyclone_freq, avg_temp_anomaly, avg_max_wind_speed, status_combined, delay_class, fms_id, project_profile,  delay_cat_contractor_issues, delay_cat_funding_financial_issues, delay_cat_legal_contractual_issues, delay_cat_pending_governmental_approvals, delay_cat_resource_technology_availability,  delay_cat_scope_or_design_changes,   delay_cat_unforeseen_site_conditions))
+
+# Add delay_class back as target
+delay_model_data_updated$delay_class <- as.factor(project_model_data_final_updated$delay_class)
+
+# --- Reusable modeling pipeline function ---
+run_models <- function(data, target_col) {
+  # Set target variable
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  # Convert character to factor
+  categorical_vars <- sapply(data, is.character)
+  categorical_vars <- names(categorical_vars[categorical_vars])
+  categorical_vars <- setdiff(categorical_vars, target_col)
+  data[categorical_vars] <- lapply(data[categorical_vars], as.factor)
+
+  # Train-test split
+  set.seed(123)
+  train_index <- createDataPartition(data[[target_col]], p = 0.8, list = FALSE)
+  train_data <- data[train_index, ]
+  test_data <- data[-train_index, ]
+
+  # --Random Forest:Cross-validated and tuned Random Forest using caret---
+  control <- trainControl(method = "cv", number = 5)
+  tunegrid <- expand.grid(.mtry = c(2, 4, 6, 8))
+  
+  cat("\n--- RANDOM FOREST RESULTS for", target_col, "---\n")
+  rf_model <- train(
+    as.formula(paste(target_col, "~ .")),
+    data = train_data,
+    method = "rf",
+    metric = "Accuracy",
+    trControl = control,
+    tuneGrid = tunegrid
+  )
+  print(rf_model)
+
+  rf_preds <- predict(rf_model, newdata = test_data)
+  print(confusionMatrix(rf_preds, test_data[[target_col]]))
+  print(varImp(rf_model))
+
+  # --- Decision Tree with caret cross-validation---
+  dt_control <- trainControl(method = "cv", number = 5)
+  
+  cat("\n--- DECISION TREE RESULTS for", target_col, "---\n")
+  dt_model <- train(
+    as.formula(paste(target_col, "~ .")),
+    data = train_data,
+    method = "rpart",
+    trControl = dt_control,
+    tuneLength = 10
+  )
+  print(dt_model)
+  dt_preds <- predict(dt_model, test_data)
+  print(confusionMatrix(dt_preds, test_data[[target_col]]))
+  png(filename = paste0("decision_tree_", target_col, ".png"), width = 2400, height = 1600, res = 300)
+rpart.plot(dt_model$finalModel, box.palette = "Greens")
+dev.off()
+
+# Also show the trees in the console
+rpart.plot(dt_model$finalModel, box.palette = "Greens")
+
+  # --- XGBoost with cross-validation and early stopping---
+  train_matrix <- model.matrix(as.formula(paste(target_col, "~ .")), data = train_data)
+  test_matrix <- model.matrix(as.formula(paste(target_col, "~ .")), data = test_data)
+
+  xgb_train <- xgb.DMatrix(data = train_matrix, label = as.numeric(train_data[[target_col]]) - 1)
+  xgb_test <- xgb.DMatrix(data = test_matrix, label = as.numeric(test_data[[target_col]]) - 1)
+
+  cat("\n--- XGBOOST RESULTS for", target_col, "---\n")
+  xgb_cv <- xgb.cv(
+    data = xgb_train,
+    nrounds = 100,
+    nfold = 5,
+    early_stopping_rounds = 30,
+    objective = "multi:softmax",
+    num_class = length(unique(train_data[[target_col]])),
+    verbose = 1
+  )
+  best_nrounds <- xgb_cv$best_iteration
+
+  xgb_model <- xgboost(
+    data = xgb_train,
+    nrounds = best_nrounds,
+    objective = "multi:softmax",
+    num_class = length(unique(train_data[[target_col]])),
+    verbose = 0
+  )
+  xgb_preds <- predict(xgb_model, xgb_test)
+  xgb_preds_factor <- factor(xgb_preds + 1, levels = 1:length(levels(train_data[[target_col]])),
+                             labels = levels(train_data[[target_col]]))
+  print(confusionMatrix(xgb_preds_factor, test_data[[target_col]]))
+}
+
+
+
+# Create and open log file
+#log_file <- file("model_output_log.txt", open = "wt")
+
+# Redirect all console output to the file
+#sink(log_file)
+
+# Optional: Add a header with timestamp
+#cat("==== MODEL RUN START ====\n")
+#cat("Timestamp: ", Sys.time(), "\n\n")
+
+
+# ---- Run for cost_class and delay_class ----
+suppressWarnings({
+  run_models(cost_model_data_updated, "cost_class")
+  run_models(delay_model_data_updated, "delay_class")
+})
+
+
+# End sink and close file
+#sink()
+#close(log_file)
+```
+
+
+## 5.3 [Same as 4.8] Implementing modeling to predict project_profile
+```{r Implementing modeling on the final data 2}
+
+# Create and open log file
+#log_file <- file("model_output_log_project_profile.txt", open = "wt")
+
+# Redirect all console output to the file
+#sink(log_file)
+
+# Optional: Add a header with timestamp
+#cat("==== MODELING PROJECT_PROFILE ====\n")
+#cat("Timestamp: ", Sys.time(), "\n\n")
+
+
+cat("\n--- DATA PREPARATION FOR project_profile ---\n")
+# ---Columns to Drop and move forward for modeling---------------------
+project_model_data_final_all_updated <- project_model_data_final_updated %>%
+  select(-c(avg_cyclone_freq, avg_temp_anomaly, avg_max_wind_speed, status_combined, cost_class, delay_class, fms_id, project_profile))
+
+# ---- Begin Classification Modeling for project_profile ----
+library(caret)
+library(randomForest)
+library(dummy)
+set.seed(123)
+
+# Convert target and categorical predictors to factors
+project_model_data_final_all_updated$project_profile <- as.factor(project_model_data_final_updated$project_profile)
+
+# Identify categorical variables (excluding the target)
+categorical_vars <- sapply(project_model_data_final_all_updated, is.character)
+categorical_vars <- names(categorical_vars[categorical_vars])
+categorical_vars <- setdiff(categorical_vars, "project_profile")
+
+# Convert character columns to factors
+project_model_data_final_all_updated[categorical_vars] <- lapply(project_model_data_final_all_updated[categorical_vars], as.factor)
+
+# Partition data into training and testing sets
+set.seed(123)
+train_index <- createDataPartition(project_model_data_final_all_updated$project_profile, p = 0.8, list = FALSE)
+train_data <- project_model_data_final_all_updated[train_index, ]
+test_data <- project_model_data_final_all_updated[-train_index, ]
+
+
+# === Random Forest ===
+cat("\n--- RANDOM FOREST RESULTS for project_profile ---\n")
+
+# Cross-validated and tuned Random Forest using caret
+control <- trainControl(method = "cv", number = 5, search = "grid")
+tunegrid <- expand.grid(.mtry = c(2, 4, 6, 8))
+
+set.seed(123)
+rf_model <- train(
+  project_profile ~ .,
+  data = train_data,
+  method = "rf",
+  metric = "Accuracy",
+  trControl = control,
+  tuneGrid = tunegrid,
+  importance = TRUE
+)
+
+print(rf_model)
+
+# Predict on test data
+rf_preds <- predict(rf_model, newdata = test_data)
+
+# Evaluate performance
+conf_mat <- confusionMatrix(rf_preds, test_data$project_profile)
+print(conf_mat)
+
+# View feature importance
+#importance(rf_model)
+varImp(rf_model)
+
+
+# === Decision Tree ===
+cat("\n--- DECISION TREE RESULTS for project_profile ---\n")
+
+# ---- Train Decision Tree and XGBoost Models for Comparison ----
+
+# Decision Tree with caret cross-validation
+dt_control <- trainControl(method = "cv", number = 5)
+dt_model <- train(
+  project_profile ~ .,
+  data = train_data,
+  method = "rpart",
+  trControl = dt_control,
+  tuneLength = 10
+)
+print(dt_model)
+predict_dt <- predict(dt_model, test_data)
+conf_mat_dt <- confusionMatrix(predict_dt, test_data$project_profile)
+print(conf_mat_dt)
+
+png(filename = "decision_tree_project_profile.png", width = 2400, height = 1600, res = 300)
+rpart.plot(dt_model$finalModel)
+dev.off()
+
+# Plot the decision tree
+library(rpart.plot)
+rpart.plot(dt_model$finalModel)
+
+# === XGBoost ===
+cat("\n--- XGBOOST RESULTS for project_profile ---\n")
+
+# XGBoost with cross-validation and early stopping
+library(xgboost)
+library(Matrix)
+
+# Convert data to numeric matrix format
+train_matrix <- model.matrix(project_profile ~ . -1, data = train_data)
+test_matrix <- model.matrix(project_profile ~ . -1, data = test_data)
+
+xgb_train <- xgb.DMatrix(data = train_matrix, label = as.numeric(train_data$project_profile) - 1)
+xgb_test <- xgb.DMatrix(data = test_matrix, label = as.numeric(test_data$project_profile) - 1)
+
+xgb_cv <- xgb.cv(
+  data = xgb_train,
+  nrounds = 100,
+  nfold = 5,
+  early_stopping_rounds = 10,
+  objective = "multi:softmax",
+  num_class = length(unique(train_data$project_profile)),
+  verbose = 1
+)
+
+best_nrounds <- xgb_cv$best_iteration
+
+xgb_model <- xgboost(
+  data = xgb_train,
+  nrounds = best_nrounds,
+  objective = "multi:softmax",
+  num_class = length(unique(train_data$project_profile)),
+  verbose = 0
+)
+
+xgb_preds <- predict(xgb_model, xgb_test)
+xgb_preds_factor <- factor(xgb_preds + 1, levels = 1:length(levels(train_data$project_profile)),
+                           labels = levels(train_data$project_profile))
+
+conf_mat_xgb <- confusionMatrix(xgb_preds_factor, test_data$project_profile)
+print(conf_mat_xgb)
+
+
+# End logging
+#sink()
+#close(log_file)
+```
+
+
+## 5.4 Some EDA and Figure to include in the Report
+
+```{r}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+
+# Load your dataset
+data <- read.csv("project_model_data_final.csv")
+
+plot_cost1 <- ggplot(project_model_data_final_updated, aes(x = cost_class)) +
+  geom_bar() +
+  labs(title = "Distribution of Cost Class")
+
+# ==== Figure A1: Histogram of cost_diff grouped by fms_id ====
+fa1 <- data %>%
+  group_by(fms_id, category_group) %>%
+  summarise(total_cost_diff = mean(cost_diff, na.rm = TRUE)) %>%
+  ggplot(aes(x = total_cost_diff)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  labs(
+    title = "Figure A1. Histogram of Summed Cost Difference per Project",
+    x = "Total Cost Difference",
+    y = "Frequency"
+  ) +
+  theme_minimal()  
+
+# ==== Figure A2: Boxplot of delay_days by borough ====
+fa2 <- data %>%
+  group_by(fms_id, delay_category) %>%
+  summarise(total_delay_days = mean(delay_days, na.rm = TRUE)) %>%
+  ggplot(aes(x = delay_category, y = total_delay_days)) +
+  geom_boxplot() +
+  labs(
+    title = "Boxplot of Total Delay Days by Delay Category",
+    x = "Delay Category",
+    y = "Total Delay Days"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+
+# ==== Figure A3: Correlation matrix of numeric features ====
+numeric_data <- project_model_data_final_updated %>% select_if(is.numeric) %>% select(-c(avg_cyclone_freq, avg_temp_anomaly, avg_max_wind_speed))
+corr_matrix <- cor(numeric_data, use = "complete.obs")
+corrplot(corr_matrix, method = "color", type = "upper", tl.cex = 0.7)
+```
+
+
+## 5.5 Plotting 9 modeling accuracy
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+
+# Load data
+conf_df <- read_csv("Confusion_Matrices_by_Model_and_Task.csv")
+
+plot_conf_matrix <- function(data, model, task, fig_number) {
+  plot_data <- data %>%
+    filter(Model == model, Task == task)
+  
+  ggplot(plot_data, aes(x = Actual, y = Predicted, fill = Freq)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = Freq), color = "black", size = 4) +
+    scale_fill_gradient(low = "gray95", high = "steelblue") +
+    labs(
+      title = paste0("Figure ", fig_number, ". ", model, " - ", task, " Classification"),
+      x = "Actual",
+      y = "Predicted"
+    ) +
+    theme_minimal()
+}
+
+
+# Cost Classification
+plot_conf_matrix(conf_df, "RF", "Cost", 1)
+plot_conf_matrix(conf_df, "DT", "Cost", "2a")
+plot_conf_matrix(conf_df, "XGB", "Cost", 7)
+
+# Delay Classification
+plot_conf_matrix(conf_df, "RF", "Delay", 10)
+plot_conf_matrix(conf_df, "DT", "Delay", 4)
+plot_conf_matrix(conf_df, "XGB", "Delay", 9)
+
+# Project Profile Classification
+plot_conf_matrix(conf_df, "RF", "Profile", "5a")
+plot_conf_matrix(conf_df, "DT", "Profile", "5b")
+plot_conf_matrix(conf_df, "XGB", "Profile", 8)
+
+```
+
+
+
+
 
 
 
