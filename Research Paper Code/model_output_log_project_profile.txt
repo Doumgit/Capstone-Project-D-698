@@ -1,0 +1,300 @@
+==== MODELING PROJECT_PROFILE ====
+Timestamp:  1747874361 
+
+
+--- DATA PREPARATION FOR project_profile ---
+
+--- RANDOM FOREST RESULTS for project_profile ---
+Random Forest 
+
+1557 samples
+  28 predictor
+   9 classes: 'Cost Risk', 'Exceptional Performance', 'Fast but Costly', 'High Risk', 'Lean Delivery', 'On Track', 'Schedule Risk', 'Strong Delivery', 'Time Risk, Cost-Saving' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 1245, 1247, 1245, 1246, 1245 
+Resampling results across tuning parameters:
+
+  mtry  Accuracy   Kappa    
+  2     0.6634333  0.3848114
+  4     0.7552879  0.5818088
+  6     0.7886936  0.6471299
+  8     0.8053933  0.6802281
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was mtry = 8.
+Confusion Matrix and Statistics
+
+                         Reference
+Prediction                Cost Risk Exceptional Performance Fast but Costly High Risk Lean Delivery On Track
+  Cost Risk                       8                       0               0         0             0        0
+  Exceptional Performance         0                       0               0         0             0        0
+  Fast but Costly                 0                       0               0         0             0        0
+  High Risk                       0                       0               0        16             0        0
+  Lean Delivery                   0                       0               0         0             2        1
+  On Track                       15                       0               0         0             5       84
+  Schedule Risk                   1                       0               0        29             0        4
+  Strong Delivery                 0                       0               1         0             0        0
+  Time Risk, Cost-Saving          0                       0               0         0             0        0
+                         Reference
+Prediction                Schedule Risk Strong Delivery Time Risk, Cost-Saving
+  Cost Risk                           0               0                      0
+  Exceptional Performance             0               0                      0
+  Fast but Costly                     0               0                      0
+  High Risk                           1               0                      0
+  Lean Delivery                       0               0                      0
+  On Track                            5               2                      0
+  Schedule Risk                     193               1                     14
+  Strong Delivery                     0               1                      0
+  Time Risk, Cost-Saving              0               0                      1
+
+Overall Statistics
+                                          
+               Accuracy : 0.7943          
+                 95% CI : (0.7503, 0.8336)
+    No Information Rate : 0.5182          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.6569          
+                                          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: Cost Risk Class: Exceptional Performance Class: Fast but Costly Class: High Risk
+Sensitivity                   0.33333                             NA               0.000000          0.35556
+Specificity                   1.00000                              1               1.000000          0.99705
+Pos Pred Value                1.00000                             NA                    NaN          0.94118
+Neg Pred Value                0.95745                             NA               0.997396          0.92098
+Prevalence                    0.06250                              0               0.002604          0.11719
+Detection Rate                0.02083                              0               0.000000          0.04167
+Detection Prevalence          0.02083                              0               0.000000          0.04427
+Balanced Accuracy             0.66667                             NA               0.500000          0.67630
+                     Class: Lean Delivery Class: On Track Class: Schedule Risk Class: Strong Delivery
+Sensitivity                      0.285714          0.9438               0.9698               0.250000
+Specificity                      0.997347          0.9085               0.7351               0.997368
+Pos Pred Value                   0.666667          0.7568               0.7975               0.500000
+Neg Pred Value                   0.986877          0.9817               0.9577               0.992147
+Prevalence                       0.018229          0.2318               0.5182               0.010417
+Detection Rate                   0.005208          0.2188               0.5026               0.002604
+Detection Prevalence             0.007812          0.2891               0.6302               0.005208
+Balanced Accuracy                0.641531          0.9261               0.8525               0.623684
+                     Class: Time Risk, Cost-Saving
+Sensitivity                               0.066667
+Specificity                               1.000000
+Pos Pred Value                            1.000000
+Neg Pred Value                            0.963446
+Prevalence                                0.039062
+Detection Rate                            0.002604
+Detection Prevalence                      0.002604
+Balanced Accuracy                         0.533333
+rf variable importance
+
+  variables are sorted by maximum importance across the classes
+  only 20 most important variables shown (out of 62)
+
+
+--- DECISION TREE RESULTS for project_profile ---
+CART 
+
+1557 samples
+  28 predictor
+   9 classes: 'Cost Risk', 'Exceptional Performance', 'Fast but Costly', 'High Risk', 'Lean Delivery', 'On Track', 'Schedule Risk', 'Strong Delivery', 'Time Risk, Cost-Saving' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 1247, 1244, 1246, 1245, 1246 
+Resampling results across tuning parameters:
+
+  cp          Accuracy   Kappa    
+  0.01056803  0.8015896  0.6783756
+  0.01188904  0.7996562  0.6742685
+  0.01254954  0.7983700  0.6715800
+  0.01321004  0.7842138  0.6443353
+  0.01453104  0.7746086  0.6277969
+  0.01585205  0.7630350  0.6060408
+  0.01849406  0.7604791  0.5989634
+  0.02774108  0.7540606  0.5858820
+  0.03963012  0.7366806  0.5515591
+  0.12351387  0.5957323  0.2076849
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was cp = 0.01056803.
+Confusion Matrix and Statistics
+
+                         Reference
+Prediction                Cost Risk Exceptional Performance Fast but Costly High Risk Lean Delivery On Track
+  Cost Risk                       7                       0               0         0             0        3
+  Exceptional Performance         0                       0               0         0             0        0
+  Fast but Costly                 0                       0               0         0             0        0
+  High Risk                       0                       0               0        11             0        0
+  Lean Delivery                   0                       0               0         0             3        0
+  On Track                       17                       0               0         0             4       86
+  Schedule Risk                   0                       0               0        34             0        0
+  Strong Delivery                 0                       0               1         0             0        0
+  Time Risk, Cost-Saving          0                       0               0         0             0        0
+                         Reference
+Prediction                Schedule Risk Strong Delivery Time Risk, Cost-Saving
+  Cost Risk                           0               0                      0
+  Exceptional Performance             0               0                      0
+  Fast but Costly                     0               0                      0
+  High Risk                           9               0                      0
+  Lean Delivery                       0               0                      0
+  On Track                            6               0                      0
+  Schedule Risk                     182               0                     12
+  Strong Delivery                     0               4                      0
+  Time Risk, Cost-Saving              2               0                      3
+
+Overall Statistics
+                                          
+               Accuracy : 0.7708          
+                 95% CI : (0.7255, 0.8119)
+    No Information Rate : 0.5182          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.6277          
+                                          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: Cost Risk Class: Exceptional Performance Class: Fast but Costly Class: High Risk
+Sensitivity                   0.29167                             NA               0.000000          0.24444
+Specificity                   0.99167                              1               1.000000          0.97345
+Pos Pred Value                0.70000                             NA                    NaN          0.55000
+Neg Pred Value                0.95455                             NA               0.997396          0.90659
+Prevalence                    0.06250                              0               0.002604          0.11719
+Detection Rate                0.01823                              0               0.000000          0.02865
+Detection Prevalence          0.02604                              0               0.000000          0.05208
+Balanced Accuracy             0.64167                             NA               0.500000          0.60895
+                     Class: Lean Delivery Class: On Track Class: Schedule Risk Class: Strong Delivery
+Sensitivity                      0.428571          0.9663               0.9146                1.00000
+Specificity                      1.000000          0.9085               0.7514                0.99737
+Pos Pred Value                   1.000000          0.7611               0.7982                0.80000
+Neg Pred Value                   0.989501          0.9889               0.8910                1.00000
+Prevalence                       0.018229          0.2318               0.5182                0.01042
+Detection Rate                   0.007812          0.2240               0.4740                0.01042
+Detection Prevalence             0.007812          0.2943               0.5938                0.01302
+Balanced Accuracy                0.714286          0.9374               0.8330                0.99868
+                     Class: Time Risk, Cost-Saving
+Sensitivity                               0.200000
+Specificity                               0.994580
+Pos Pred Value                            0.600000
+Neg Pred Value                            0.968338
+Prevalence                                0.039062
+Detection Rate                            0.007812
+Detection Prevalence                      0.013021
+Balanced Accuracy                         0.597290
+null device 
+          1 
+
+--- XGBOOST RESULTS for project_profile ---
+[1]	train-mlogloss:1.358658+0.007169	test-mlogloss:1.420773+0.016626 
+Multiple eval metrics are present. Will use test_mlogloss for early stopping.
+Will train until test_mlogloss hasn't improved in 10 rounds.
+
+[2]	train-mlogloss:1.030857+0.005699	test-mlogloss:1.135453+0.026113 
+[3]	train-mlogloss:0.822586+0.004360	test-mlogloss:0.962589+0.031164 
+[4]	train-mlogloss:0.673864+0.004795	test-mlogloss:0.841223+0.035918 
+[5]	train-mlogloss:0.563453+0.005594	test-mlogloss:0.751789+0.038810 
+[6]	train-mlogloss:0.476276+0.005508	test-mlogloss:0.684273+0.041543 
+[7]	train-mlogloss:0.409583+0.004929	test-mlogloss:0.630329+0.043619 
+[8]	train-mlogloss:0.354675+0.006289	test-mlogloss:0.587649+0.044129 
+[9]	train-mlogloss:0.312413+0.006592	test-mlogloss:0.556816+0.046408 
+[10]	train-mlogloss:0.275202+0.007336	test-mlogloss:0.530415+0.048070 
+[11]	train-mlogloss:0.245219+0.007442	test-mlogloss:0.509333+0.049315 
+[12]	train-mlogloss:0.221239+0.007023	test-mlogloss:0.492003+0.049535 
+[13]	train-mlogloss:0.199314+0.006544	test-mlogloss:0.476383+0.049151 
+[14]	train-mlogloss:0.181274+0.006507	test-mlogloss:0.465784+0.049714 
+[15]	train-mlogloss:0.165401+0.005807	test-mlogloss:0.455463+0.050190 
+[16]	train-mlogloss:0.151722+0.005628	test-mlogloss:0.448557+0.053157 
+[17]	train-mlogloss:0.140643+0.005257	test-mlogloss:0.441595+0.052534 
+[18]	train-mlogloss:0.129438+0.004499	test-mlogloss:0.437128+0.055184 
+[19]	train-mlogloss:0.119797+0.004496	test-mlogloss:0.431756+0.056326 
+[20]	train-mlogloss:0.111570+0.004261	test-mlogloss:0.428919+0.058129 
+[21]	train-mlogloss:0.103742+0.004475	test-mlogloss:0.426390+0.059203 
+[22]	train-mlogloss:0.096511+0.004746	test-mlogloss:0.423300+0.059003 
+[23]	train-mlogloss:0.090776+0.004426	test-mlogloss:0.419870+0.060253 
+[24]	train-mlogloss:0.085178+0.004742	test-mlogloss:0.419634+0.062748 
+[25]	train-mlogloss:0.079910+0.003781	test-mlogloss:0.418914+0.062170 
+[26]	train-mlogloss:0.075259+0.003447	test-mlogloss:0.418335+0.062240 
+[27]	train-mlogloss:0.071174+0.003485	test-mlogloss:0.416705+0.062259 
+[28]	train-mlogloss:0.067578+0.003540	test-mlogloss:0.416882+0.063778 
+[29]	train-mlogloss:0.063848+0.003171	test-mlogloss:0.417880+0.064809 
+[30]	train-mlogloss:0.060625+0.003023	test-mlogloss:0.418086+0.065371 
+[31]	train-mlogloss:0.057392+0.002734	test-mlogloss:0.419394+0.066536 
+[32]	train-mlogloss:0.054432+0.002682	test-mlogloss:0.420969+0.066874 
+[33]	train-mlogloss:0.051938+0.002420	test-mlogloss:0.421281+0.067218 
+[34]	train-mlogloss:0.049583+0.002420	test-mlogloss:0.422624+0.068174 
+[35]	train-mlogloss:0.047432+0.002401	test-mlogloss:0.422538+0.069857 
+[36]	train-mlogloss:0.045303+0.002341	test-mlogloss:0.423243+0.069687 
+[37]	train-mlogloss:0.043237+0.002164	test-mlogloss:0.424923+0.070795 
+Stopping. Best iteration:
+[27]	train-mlogloss:0.071174+0.003485	test-mlogloss:0.416705+0.062259
+
+Confusion Matrix and Statistics
+
+                         Reference
+Prediction                Cost Risk Exceptional Performance Fast but Costly High Risk Lean Delivery On Track
+  Cost Risk                      14                       0               0         0             0        2
+  Exceptional Performance         0                       0               0         0             0        0
+  Fast but Costly                 0                       0               0         0             0        0
+  High Risk                       2                       0               0        29             0        0
+  Lean Delivery                   0                       0               0         0             3        0
+  On Track                        8                       0               0         0             4       87
+  Schedule Risk                   0                       0               0        16             0        0
+  Strong Delivery                 0                       0               1         0             0        0
+  Time Risk, Cost-Saving          0                       0               0         0             0        0
+                         Reference
+Prediction                Schedule Risk Strong Delivery Time Risk, Cost-Saving
+  Cost Risk                           0               0                      0
+  Exceptional Performance             0               0                      0
+  Fast but Costly                     0               1                      0
+  High Risk                           9               0                      0
+  Lean Delivery                       0               0                      0
+  On Track                            0               0                      0
+  Schedule Risk                     187               0                      8
+  Strong Delivery                     0               3                      0
+  Time Risk, Cost-Saving              3               0                      7
+
+Overall Statistics
+                                          
+               Accuracy : 0.8594          
+                 95% CI : (0.8205, 0.8926)
+    No Information Rate : 0.5182          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.7801          
+                                          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: Cost Risk Class: Exceptional Performance Class: Fast but Costly Class: High Risk
+Sensitivity                   0.58333                             NA               0.000000          0.64444
+Specificity                   0.99444                              1               0.997389          0.96755
+Pos Pred Value                0.87500                             NA               0.000000          0.72500
+Neg Pred Value                0.97283                             NA               0.997389          0.95349
+Prevalence                    0.06250                              0               0.002604          0.11719
+Detection Rate                0.03646                              0               0.000000          0.07552
+Detection Prevalence          0.04167                              0               0.002604          0.10417
+Balanced Accuracy             0.78889                             NA               0.498695          0.80600
+                     Class: Lean Delivery Class: On Track Class: Schedule Risk Class: Strong Delivery
+Sensitivity                      0.428571          0.9775               0.9397               0.750000
+Specificity                      1.000000          0.9593               0.8703               0.997368
+Pos Pred Value                   1.000000          0.8788               0.8863               0.750000
+Neg Pred Value                   0.989501          0.9930               0.9306               0.997368
+Prevalence                       0.018229          0.2318               0.5182               0.010417
+Detection Rate                   0.007812          0.2266               0.4870               0.007812
+Detection Prevalence             0.007812          0.2578               0.5495               0.010417
+Balanced Accuracy                0.714286          0.9684               0.9050               0.873684
+                     Class: Time Risk, Cost-Saving
+Sensitivity                                0.46667
+Specificity                                0.99187
+Pos Pred Value                             0.70000
+Neg Pred Value                             0.97861
+Prevalence                                 0.03906
+Detection Rate                             0.01823
+Detection Prevalence                       0.02604
+Balanced Accuracy                          0.72927

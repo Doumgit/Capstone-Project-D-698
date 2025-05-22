@@ -1,0 +1,402 @@
+==== MODEL RUN START ====
+Timestamp:  1747872302 
+
+
+--- RANDOM FOREST RESULTS for cost_class ---
+Random Forest 
+
+1554 samples
+  22 predictor
+   3 classes: 'On Budget', 'Over Budget', 'Under Budget' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 1243, 1244, 1244, 1243, 1242 
+Resampling results across tuning parameters:
+
+  mtry  Accuracy   Kappa     
+  2     0.7554725  0.00000000
+  4     0.7606151  0.04092505
+  6     0.7606172  0.07261154
+  8     0.7548211  0.08069591
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was mtry = 6.
+Confusion Matrix and Statistics
+
+              Reference
+Prediction     On Budget Over Budget Under Budget
+  On Budget          292          67           23
+  Over Budget          1           4            0
+  Under Budget         0           0            0
+
+Overall Statistics
+                                          
+               Accuracy : 0.7649          
+                 95% CI : (0.7194, 0.8062)
+    No Information Rate : 0.7571          
+    P-Value [Acc > NIR] : 0.3871          
+                                          
+                  Kappa : 0.0606          
+                                          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: On Budget Class: Over Budget Class: Under Budget
+Sensitivity                   0.99659            0.05634             0.00000
+Specificity                   0.04255            0.99684             1.00000
+Pos Pred Value                0.76440            0.80000                 NaN
+Neg Pred Value                0.80000            0.82461             0.94057
+Prevalence                    0.75711            0.18346             0.05943
+Detection Rate                0.75452            0.01034             0.00000
+Detection Prevalence          0.98708            0.01292             0.00000
+Balanced Accuracy             0.51957            0.52659             0.50000
+rf variable importance
+
+  only 20 most important variables shown (out of 57)
+
+
+--- DECISION TREE RESULTS for cost_class ---
+CART 
+
+1554 samples
+  22 predictor
+   3 classes: 'On Budget', 'Over Budget', 'Under Budget' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 1244, 1244, 1242, 1243, 1243 
+Resampling results across tuning parameters:
+
+  cp            Accuracy   Kappa     
+  0.0000000000  0.7007539  0.11562306
+  0.0007602339  0.7026894  0.11522456
+  0.0015204678  0.7174866  0.13315633
+  0.0022807018  0.7155677  0.11200572
+  0.0030409357  0.7226562  0.11114512
+  0.0038011696  0.7335928  0.11279268
+  0.0045614035  0.7380924  0.08986051
+  0.0053216374  0.7445337  0.08715169
+  0.0060818713  0.7477491  0.07621737
+  0.0068421053  0.7464650  0.03091202
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was cp = 0.006081871.
+Confusion Matrix and Statistics
+
+              Reference
+Prediction     On Budget Over Budget Under Budget
+  On Budget          289          62           22
+  Over Budget          4           9            1
+  Under Budget         0           0            0
+
+Overall Statistics
+                                         
+               Accuracy : 0.77           
+                 95% CI : (0.7248, 0.811)
+    No Information Rate : 0.7571         
+    P-Value [Acc > NIR] : 0.2994         
+                                         
+                  Kappa : 0.1277         
+                                         
+ Mcnemar's Test P-Value : 6.024e-16      
+
+Statistics by Class:
+
+                     Class: On Budget Class: Over Budget Class: Under Budget
+Sensitivity                    0.9863            0.12676             0.00000
+Specificity                    0.1064            0.98418             1.00000
+Pos Pred Value                 0.7748            0.64286                 NaN
+Neg Pred Value                 0.7143            0.83378             0.94057
+Prevalence                     0.7571            0.18346             0.05943
+Detection Rate                 0.7468            0.02326             0.00000
+Detection Prevalence           0.9638            0.03618             0.00000
+Balanced Accuracy              0.5464            0.55547             0.50000
+
+--- XGBOOST RESULTS for cost_class ---
+[1]	train-mlogloss:0.887768+0.005812	test-mlogloss:0.923151+0.015179 
+Multiple eval metrics are present. Will use test_mlogloss for early stopping.
+Will train until test_mlogloss hasn't improved in 30 rounds.
+
+[2]	train-mlogloss:0.760878+0.008331	test-mlogloss:0.821889+0.023185 
+[3]	train-mlogloss:0.674412+0.011000	test-mlogloss:0.757743+0.029715 
+[4]	train-mlogloss:0.612857+0.011904	test-mlogloss:0.714487+0.035379 
+[5]	train-mlogloss:0.568406+0.014165	test-mlogloss:0.687226+0.039899 
+[6]	train-mlogloss:0.533015+0.013610	test-mlogloss:0.669458+0.045447 
+[7]	train-mlogloss:0.502197+0.014371	test-mlogloss:0.659057+0.049157 
+[8]	train-mlogloss:0.478489+0.016699	test-mlogloss:0.652590+0.051993 
+[9]	train-mlogloss:0.459037+0.014937	test-mlogloss:0.647527+0.054316 
+[10]	train-mlogloss:0.440933+0.015917	test-mlogloss:0.646326+0.055117 
+[11]	train-mlogloss:0.425611+0.014096	test-mlogloss:0.645834+0.055861 
+[12]	train-mlogloss:0.412640+0.014905	test-mlogloss:0.644400+0.057112 
+[13]	train-mlogloss:0.399750+0.017361	test-mlogloss:0.645088+0.058395 
+[14]	train-mlogloss:0.388773+0.017261	test-mlogloss:0.644259+0.059464 
+[15]	train-mlogloss:0.375553+0.020445	test-mlogloss:0.643353+0.059043 
+[16]	train-mlogloss:0.364704+0.018801	test-mlogloss:0.645274+0.061897 
+[17]	train-mlogloss:0.353080+0.017515	test-mlogloss:0.647406+0.064097 
+[18]	train-mlogloss:0.343122+0.017203	test-mlogloss:0.647911+0.065170 
+[19]	train-mlogloss:0.332505+0.017487	test-mlogloss:0.649251+0.066935 
+[20]	train-mlogloss:0.324940+0.020022	test-mlogloss:0.648517+0.067603 
+[21]	train-mlogloss:0.315344+0.018864	test-mlogloss:0.648712+0.068607 
+[22]	train-mlogloss:0.307646+0.017624	test-mlogloss:0.649752+0.068392 
+[23]	train-mlogloss:0.300910+0.015950	test-mlogloss:0.652505+0.069176 
+[24]	train-mlogloss:0.292002+0.015749	test-mlogloss:0.654199+0.071317 
+[25]	train-mlogloss:0.285772+0.015213	test-mlogloss:0.655914+0.071929 
+[26]	train-mlogloss:0.280205+0.015469	test-mlogloss:0.656852+0.072328 
+[27]	train-mlogloss:0.275365+0.015537	test-mlogloss:0.658483+0.074106 
+[28]	train-mlogloss:0.269195+0.015083	test-mlogloss:0.660956+0.075366 
+[29]	train-mlogloss:0.263116+0.015895	test-mlogloss:0.662217+0.075736 
+[30]	train-mlogloss:0.254898+0.014177	test-mlogloss:0.663632+0.075052 
+[31]	train-mlogloss:0.248984+0.015004	test-mlogloss:0.664849+0.075671 
+[32]	train-mlogloss:0.241884+0.014176	test-mlogloss:0.667764+0.077089 
+[33]	train-mlogloss:0.236560+0.015010	test-mlogloss:0.670152+0.077186 
+[34]	train-mlogloss:0.231822+0.015446	test-mlogloss:0.671251+0.078019 
+[35]	train-mlogloss:0.225721+0.015070	test-mlogloss:0.672165+0.079058 
+[36]	train-mlogloss:0.221899+0.015123	test-mlogloss:0.673536+0.081486 
+[37]	train-mlogloss:0.218094+0.014914	test-mlogloss:0.675164+0.082205 
+[38]	train-mlogloss:0.214128+0.014216	test-mlogloss:0.675853+0.082869 
+[39]	train-mlogloss:0.208898+0.014028	test-mlogloss:0.676974+0.082746 
+[40]	train-mlogloss:0.204170+0.014649	test-mlogloss:0.677111+0.083475 
+[41]	train-mlogloss:0.199458+0.013241	test-mlogloss:0.678648+0.084290 
+[42]	train-mlogloss:0.195507+0.013514	test-mlogloss:0.679645+0.084079 
+[43]	train-mlogloss:0.191264+0.012295	test-mlogloss:0.680673+0.084683 
+[44]	train-mlogloss:0.187796+0.012197	test-mlogloss:0.682268+0.085344 
+[45]	train-mlogloss:0.184318+0.011606	test-mlogloss:0.682723+0.084737 
+Stopping. Best iteration:
+[15]	train-mlogloss:0.375553+0.020445	test-mlogloss:0.643353+0.059043
+
+Confusion Matrix and Statistics
+
+              Reference
+Prediction     On Budget Over Budget Under Budget
+  On Budget          284          62           23
+  Over Budget          9           8            0
+  Under Budget         0           1            0
+
+Overall Statistics
+                                          
+               Accuracy : 0.7545          
+                 95% CI : (0.7085, 0.7966)
+    No Information Rate : 0.7571          
+    P-Value [Acc > NIR] : 0.5744          
+                                          
+                  Kappa : 0.0905          
+                                          
+ Mcnemar's Test P-Value : 1.018e-13       
+
+Statistics by Class:
+
+                     Class: On Budget Class: Over Budget Class: Under Budget
+Sensitivity                   0.96928            0.11268            0.000000
+Specificity                   0.09574            0.97152            0.997253
+Pos Pred Value                0.76965            0.47059            0.000000
+Neg Pred Value                0.50000            0.82973            0.940415
+Prevalence                    0.75711            0.18346            0.059432
+Detection Rate                0.73385            0.02067            0.000000
+Detection Prevalence          0.95349            0.04393            0.002584
+Balanced Accuracy             0.53251            0.54210            0.498626
+
+--- RANDOM FOREST RESULTS for delay_class ---
+Random Forest 
+
+1554 samples
+  22 predictor
+   3 classes: 'Delayed', 'Early', 'On Time' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 1244, 1243, 1243, 1243, 1243 
+Resampling results across tuning parameters:
+
+  mtry  Accuracy   Kappa    
+  2     0.7284327  0.2388249
+  4     0.8153241  0.5488512
+  6     0.8346250  0.6059968
+  8     0.8378384  0.6185044
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was mtry = 8.
+Confusion Matrix and Statistics
+
+          Reference
+Prediction Delayed Early On Time
+   Delayed     246     3      39
+   Early         0     0       0
+   On Time      14     3      82
+
+Overall Statistics
+                                          
+               Accuracy : 0.8475          
+                 95% CI : (0.8078, 0.8819)
+    No Information Rate : 0.6718          
+    P-Value [Acc > NIR] : 3.129e-15       
+                                          
+                  Kappa : 0.6371          
+                                          
+ Mcnemar's Test P-Value : 0.0004854       
+
+Statistics by Class:
+
+                     Class: Delayed Class: Early Class: On Time
+Sensitivity                  0.9462       0.0000         0.6777
+Specificity                  0.6693       1.0000         0.9361
+Pos Pred Value               0.8542          NaN         0.8283
+Neg Pred Value               0.8586       0.9845         0.8646
+Prevalence                   0.6718       0.0155         0.3127
+Detection Rate               0.6357       0.0000         0.2119
+Detection Prevalence         0.7442       0.0000         0.2558
+Balanced Accuracy            0.8077       0.5000         0.8069
+rf variable importance
+
+  only 20 most important variables shown (out of 57)
+
+
+--- DECISION TREE RESULTS for delay_class ---
+CART 
+
+1554 samples
+  22 predictor
+   3 classes: 'Delayed', 'Early', 'On Time' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 1245, 1242, 1243, 1243, 1243 
+Resampling results across tuning parameters:
+
+  cp           Accuracy   Kappa     
+  0.003137255  0.7979694  0.54501570
+  0.003921569  0.7973325  0.54099063
+  0.004411765  0.7954053  0.53488860
+  0.004901961  0.7992639  0.53693097
+  0.006535948  0.7992597  0.53188339
+  0.007843137  0.7992639  0.53157629
+  0.008496732  0.7992639  0.53157629
+  0.017647059  0.7915033  0.50670992
+  0.052941176  0.7264388  0.28474459
+  0.069934641  0.6853224  0.09032251
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was cp = 0.008496732.
+Confusion Matrix and Statistics
+
+          Reference
+Prediction Delayed Early On Time
+   Delayed     245     3      61
+   Early         0     0       0
+   On Time      15     3      60
+
+Overall Statistics
+                                         
+               Accuracy : 0.7881         
+                 95% CI : (0.744, 0.8278)
+    No Information Rate : 0.6718         
+    P-Value [Acc > NIR] : 2.926e-07      
+                                         
+                  Kappa : 0.471          
+                                         
+ Mcnemar's Test P-Value : 2.139e-07      
+
+Statistics by Class:
+
+                     Class: Delayed Class: Early Class: On Time
+Sensitivity                  0.9423       0.0000         0.4959
+Specificity                  0.4961       1.0000         0.9323
+Pos Pred Value               0.7929          NaN         0.7692
+Neg Pred Value               0.8077       0.9845         0.8026
+Prevalence                   0.6718       0.0155         0.3127
+Detection Rate               0.6331       0.0000         0.1550
+Detection Prevalence         0.7984       0.0000         0.2016
+Balanced Accuracy            0.7192       0.5000         0.7141
+
+--- XGBOOST RESULTS for delay_class ---
+[1]	train-mlogloss:0.826408+0.011008	test-mlogloss:0.863239+0.014101 
+Multiple eval metrics are present. Will use test_mlogloss for early stopping.
+Will train until test_mlogloss hasn't improved in 30 rounds.
+
+[2]	train-mlogloss:0.655989+0.013637	test-mlogloss:0.721205+0.016923 
+[3]	train-mlogloss:0.541655+0.016292	test-mlogloss:0.628364+0.019927 
+[4]	train-mlogloss:0.457313+0.015124	test-mlogloss:0.563795+0.021942 
+[5]	train-mlogloss:0.393843+0.016858	test-mlogloss:0.520722+0.023334 
+[6]	train-mlogloss:0.348276+0.014736	test-mlogloss:0.491482+0.026111 
+[7]	train-mlogloss:0.312556+0.012345	test-mlogloss:0.469159+0.029022 
+[8]	train-mlogloss:0.287547+0.011837	test-mlogloss:0.456392+0.030737 
+[9]	train-mlogloss:0.264529+0.012230	test-mlogloss:0.441874+0.034598 
+[10]	train-mlogloss:0.248543+0.012574	test-mlogloss:0.435564+0.036166 
+[11]	train-mlogloss:0.232302+0.011096	test-mlogloss:0.427123+0.034630 
+[12]	train-mlogloss:0.217774+0.009507	test-mlogloss:0.420173+0.035817 
+[13]	train-mlogloss:0.206593+0.008010	test-mlogloss:0.413795+0.033681 
+[14]	train-mlogloss:0.196954+0.009458	test-mlogloss:0.413855+0.035078 
+[15]	train-mlogloss:0.187556+0.008513	test-mlogloss:0.411759+0.035869 
+[16]	train-mlogloss:0.180500+0.008746	test-mlogloss:0.410663+0.037418 
+[17]	train-mlogloss:0.173841+0.008171	test-mlogloss:0.408923+0.037263 
+[18]	train-mlogloss:0.168239+0.008199	test-mlogloss:0.407954+0.038058 
+[19]	train-mlogloss:0.163368+0.009279	test-mlogloss:0.407317+0.038231 
+[20]	train-mlogloss:0.157510+0.009984	test-mlogloss:0.406603+0.038261 
+[21]	train-mlogloss:0.151951+0.009545	test-mlogloss:0.406020+0.037694 
+[22]	train-mlogloss:0.146879+0.009448	test-mlogloss:0.405290+0.037898 
+[23]	train-mlogloss:0.142311+0.010343	test-mlogloss:0.405295+0.037746 
+[24]	train-mlogloss:0.137844+0.009609	test-mlogloss:0.403497+0.037133 
+[25]	train-mlogloss:0.134606+0.008887	test-mlogloss:0.403741+0.037721 
+[26]	train-mlogloss:0.130640+0.009301	test-mlogloss:0.404121+0.038896 
+[27]	train-mlogloss:0.125127+0.008437	test-mlogloss:0.403806+0.040436 
+[28]	train-mlogloss:0.122008+0.008460	test-mlogloss:0.405078+0.040493 
+[29]	train-mlogloss:0.118746+0.008753	test-mlogloss:0.406238+0.039601 
+[30]	train-mlogloss:0.115612+0.008158	test-mlogloss:0.407999+0.040227 
+[31]	train-mlogloss:0.111936+0.007988	test-mlogloss:0.408885+0.042007 
+[32]	train-mlogloss:0.108980+0.007750	test-mlogloss:0.409129+0.042310 
+[33]	train-mlogloss:0.105626+0.007480	test-mlogloss:0.410054+0.041501 
+[34]	train-mlogloss:0.103129+0.007616	test-mlogloss:0.410937+0.041942 
+[35]	train-mlogloss:0.100326+0.007097	test-mlogloss:0.411809+0.041893 
+[36]	train-mlogloss:0.097737+0.007265	test-mlogloss:0.412738+0.042380 
+[37]	train-mlogloss:0.095429+0.006976	test-mlogloss:0.413188+0.042340 
+[38]	train-mlogloss:0.092733+0.007875	test-mlogloss:0.413010+0.042383 
+[39]	train-mlogloss:0.090090+0.007582	test-mlogloss:0.413254+0.042973 
+[40]	train-mlogloss:0.087713+0.007415	test-mlogloss:0.414115+0.042834 
+[41]	train-mlogloss:0.084942+0.006611	test-mlogloss:0.413771+0.043059 
+[42]	train-mlogloss:0.082556+0.006170	test-mlogloss:0.415606+0.043840 
+[43]	train-mlogloss:0.080572+0.006268	test-mlogloss:0.416480+0.043740 
+[44]	train-mlogloss:0.078698+0.006212	test-mlogloss:0.417975+0.045144 
+[45]	train-mlogloss:0.077271+0.005914	test-mlogloss:0.419727+0.046303 
+[46]	train-mlogloss:0.075690+0.005771	test-mlogloss:0.420733+0.045416 
+[47]	train-mlogloss:0.073860+0.005404	test-mlogloss:0.422147+0.045235 
+[48]	train-mlogloss:0.071896+0.005420	test-mlogloss:0.423253+0.044359 
+[49]	train-mlogloss:0.070443+0.005131	test-mlogloss:0.423242+0.044726 
+[50]	train-mlogloss:0.068822+0.005515	test-mlogloss:0.424324+0.045030 
+[51]	train-mlogloss:0.067042+0.004812	test-mlogloss:0.423680+0.045169 
+[52]	train-mlogloss:0.065159+0.004211	test-mlogloss:0.424942+0.045394 
+[53]	train-mlogloss:0.063587+0.003853	test-mlogloss:0.426515+0.045568 
+[54]	train-mlogloss:0.062240+0.003756	test-mlogloss:0.428056+0.045202 
+Stopping. Best iteration:
+[24]	train-mlogloss:0.137844+0.009609	test-mlogloss:0.403497+0.037133
+
+Confusion Matrix and Statistics
+
+          Reference
+Prediction Delayed Early On Time
+   Delayed     243     3      28
+   Early         1     0       1
+   On Time      16     3      92
+
+Overall Statistics
+                                         
+               Accuracy : 0.8656         
+                 95% CI : (0.8276, 0.898)
+    No Information Rate : 0.6718         
+    P-Value [Acc > NIR] : <2e-16         
+                                         
+                  Kappa : 0.6908         
+                                         
+ Mcnemar's Test P-Value : 0.1529         
+
+Statistics by Class:
+
+                     Class: Delayed Class: Early Class: On Time
+Sensitivity                  0.9346     0.000000         0.7603
+Specificity                  0.7559     0.994751         0.9286
+Pos Pred Value               0.8869     0.000000         0.8288
+Neg Pred Value               0.8496     0.984416         0.8949
+Prevalence                   0.6718     0.015504         0.3127
+Detection Rate               0.6279     0.000000         0.2377
+Detection Prevalence         0.7080     0.005168         0.2868
+Balanced Accuracy            0.8453     0.497375         0.8445
